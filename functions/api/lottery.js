@@ -1,110 +1,53 @@
 /**
  * Cloudflare Pages Function: /api/lottery
- * (path kept as /api/lottery for frontend compatibility)
  *
- * Uses Tavily Search API to fetch real-time lottery draw data.
- * No LLM required — structured search + regex extraction.
+ * Uses Tavily Search API to fetch Chinese lottery draw results.
+ * Searches Chinese-language sources with site restrictions.
  *
- * Environment variables (Pages → Settings → Environment variables):
- *   TAVILY_API_KEY  – your Tavily API key  (tvly-xxxxxxx)
- *   ALLOWED_ORIGIN  – your Pages domain (optional)
+ * Environment variables:
+ *   TAVILY_API_KEY  – Tavily API key (tvly-xxxxxxx)
  */
 
-// ── Lottery search query templates ──────────────────────────────
-const LOTTERY_QUERIES = {
-  ssq:  (issue) => issue ? `双色球第${issue}期开奖号码` : `双色球最新开奖号码期次`,
-  dlt:  (issue) => issue ? `大乐透第${issue}期开奖号码` : `大乐透最新开奖号码期次`,
-  qxc:  (issue) => issue ? `七星彩第${issue}期开奖号码` : `七星彩最新开奖号码期次`,
-  fc3d: (issue) => issue ? `福彩3D第${issue}期开奖号码` : `福彩3D最新开奖号码期次`,
-  p5:   (issue) => issue ? `排列五第${issue}期开奖号码` : `排列五最新开奖号码期次`,
+// ── Per-lottery search config ───────────────────────────────────
+const LOTTERY_CONFIG = {
+  ssq: {
+    name: '双色球',
+    latestQuery:  (today) => `双色球最新开奖结果 ${today} 期次 红球 蓝球 site:cwl.gov.cn OR site:zhcw.com OR site:500.com`,
+    issueQuery:   (issue) => `双色球 ${issue}期 开奖结果 红球 蓝球 site:cwl.gov.cn OR site:zhcw.com OR site:500.com`,
+    redCount: 6, blueCount: 1,
+    redRange: [1,33], blueRange: [1,16],
+  },
+  dlt: {
+    name: '大乐透',
+    latestQuery:  (today) => `大乐透最新开奖结果 ${today} 期次 前区 后区 site:lottery.gov.cn OR site:sporttery.cn OR site:500.com`,
+    issueQuery:   (issue) => `大乐透 ${issue}期 开奖结果 前区 后区 site:sporttery.cn OR site:500.com`,
+    redCount: 5, blueCount: 2,
+    redRange: [1,35], blueRange: [1,12],
+  },
+  qxc: {
+    name: '七星彩',
+    latestQuery:  (today) => `七星彩最新开奖号码 ${today} 期次 site:sporttery.cn OR site:500.com OR site:zhcw.com`,
+    issueQuery:   (issue) => `七星彩 ${issue}期 开奖号码 site:sporttery.cn OR site:500.com`,
+    redCount: 7, blueCount: 0,
+    redRange: [0,9], blueRange: null,
+  },
+  fc3d: {
+    name: '福彩3D',
+    latestQuery:  (today) => `福彩3D最新开奖号码 ${today} 期次 site:cwl.gov.cn OR site:zhcw.com OR site:500.com`,
+    issueQuery:   (issue) => `福彩3D ${issue}期 开奖号码 site:cwl.gov.cn OR site:zhcw.com`,
+    redCount: 3, blueCount: 0,
+    redRange: [0,9], blueRange: null,
+  },
+  p5: {
+    name: '排列五',
+    latestQuery:  (today) => `排列五最新开奖号码 ${today} 期次 site:cwl.gov.cn OR site:zhcw.com OR site:500.com`,
+    issueQuery:   (issue) => `排列五 ${issue}期 开奖号码 site:cwl.gov.cn OR site:zhcw.com`,
+    redCount: 5, blueCount: 0,
+    redRange: [0,9], blueRange: null,
+  },
 };
 
-// ── Extract lottery data from Tavily results ─────────────────────
-function extractLotteryData(type, results, targetIssue) {
-  // Merge all result text
-  const text = results.map(r => (r.title || '') + ' ' + (r.content || '')).join('\n');
-
-  // ── Issue number: 7-digit like 2026063 ──
-  const issueNums = [...text.matchAll(/20\d{2}[012]\d{2}/g)]
-    .map(m => parseInt(m[0]))
-    .filter(n => n >= 2020001 && n <= 2030999)
-    .sort((a, b) => b - a);
-
-  let issue = targetIssue
-    ? (issueNums.find(n => String(n) === String(targetIssue)) ? String(targetIssue) : null)
-    : (issueNums[0] ? String(issueNums[0]) : null);
-
-  if (!issue) return null;
-
-  // ── Draw date ──
-  let date = '';
-  const dm = text.match(/(\d{4})[-年](\d{1,2})[-月](\d{1,2})/);
-  if (dm) date = `${dm[1]}-${dm[2].padStart(2,'0')}-${dm[3].padStart(2,'0')}`;
-
-  // ── Ball numbers by lottery type ──
-  let red = [], blue = [];
-
-  if (type === 'ssq') {
-    // 双色球: 6红(01-33) + 1蓝(01-16)
-    // Try "XX XX XX XX XX XX + XX" pattern
-    const m = text.match(/\b(\d{2})\s+(\d{2})\s+(\d{2})\s+(\d{2})\s+(\d{2})\s+(\d{2})\s*[+＋]\s*(\d{2})/);
-    if (m) {
-      red  = [m[1],m[2],m[3],m[4],m[5],m[6]].map(Number).filter(n=>n>=1&&n<=33);
-      blue = [parseInt(m[7])].filter(n=>n>=1&&n<=16);
-    }
-    // Fallback: comma/顿号 separated
-    if (red.length < 6) {
-      const m2 = text.match(/红球[：:]?\s*([\d,，、\s]+?)[\s蓝]/);
-      if (m2) red = m2[1].match(/\d+/g).map(Number).filter(n=>n>=1&&n<=33).slice(0,6);
-      const m3 = text.match(/蓝球[：:]?\s*(\d+)/);
-      if (m3) blue = [parseInt(m3[1])].filter(n=>n>=1&&n<=16);
-    }
-
-  } else if (type === 'dlt') {
-    // 大乐透: 5前(01-35) + 2后(01-12)
-    const m = text.match(/\b(\d{2})\s+(\d{2})\s+(\d{2})\s+(\d{2})\s+(\d{2})\s*[+＋]\s*(\d{2})\s+(\d{2})/);
-    if (m) {
-      red  = [m[1],m[2],m[3],m[4],m[5]].map(Number).filter(n=>n>=1&&n<=35);
-      blue = [parseInt(m[6]),parseInt(m[7])].filter(n=>n>=1&&n<=12);
-    }
-    if (red.length < 5) {
-      const m2 = text.match(/前区[：:]?\s*([\d,，、\s]+?)后区/);
-      if (m2) red = m2[1].match(/\d+/g).map(Number).filter(n=>n>=1&&n<=35).slice(0,5);
-      const m3 = text.match(/后区[：:]?\s*([\d,，\s]+)/);
-      if (m3) blue = m3[1].match(/\d+/g).map(Number).filter(n=>n>=1&&n<=12).slice(0,2);
-    }
-
-  } else if (type === 'qxc') {
-    // 七星彩: 7位数字0-9
-    const m = text.match(/七星彩[^\d]*(\d[\s,]*\d[\s,]*\d[\s,]*\d[\s,]*\d[\s,]*\d[\s,]*\d)/);
-    if (m) red = m[1].match(/\d/g).map(Number).slice(0,7);
-
-  } else if (type === 'fc3d') {
-    // 福彩3D: 3位数字0-9
-    const m = text.match(/3D[^\d]*(\d[\s,]*\d[\s,]*\d)/i);
-    if (m) red = m[1].match(/\d/g).map(Number).slice(0,3);
-    if (red.length < 3) {
-      const m2 = text.match(/开奖号码[：:\s]*(\d{3})/);
-      if (m2) red = m2[1].split('').map(Number);
-    }
-
-  } else if (type === 'p5') {
-    // 排列五: 5位数字0-9
-    const m = text.match(/排列五[^\d]*(\d[\s,]*\d[\s,]*\d[\s,]*\d[\s,]*\d)/);
-    if (m) red = m[1].match(/\d/g).map(Number).slice(0,5);
-    if (red.length < 5) {
-      const m2 = text.match(/开奖号码[：:\s]*(\d{5})/);
-      if (m2) red = m2[1].split('').map(Number);
-    }
-  }
-
-  const minBalls = { ssq:6, dlt:5, qxc:7, fc3d:3, p5:5 };
-  if (red.length < minBalls[type]) return null;
-
-  return { issue, date, red, blue };
-}
-
-// ── Call Tavily Search API ────────────────────────────────────────
+// ── Tavily search ────────────────────────────────────────────────
 async function tavilySearch(apiKey, query) {
   const resp = await fetch('https://api.tavily.com/search', {
     method: 'POST',
@@ -114,70 +57,182 @@ async function tavilySearch(apiKey, query) {
     },
     body: JSON.stringify({
       query,
-      search_depth:   'basic',
-      max_results:    5,
-      include_answer: true,
-      topic:          'news',
+      search_depth:    'advanced',   // deeper search for better results
+      max_results:     8,
+      include_answer:  true,
+      include_domains: [             // restrict to Chinese lottery sites
+        'cwl.gov.cn', 'zhcw.com', 'sporttery.cn',
+        'lottery.gov.cn', '500.com', 'cjcp.com.cn',
+        'caipiao.163.com', 'aicai.com',
+      ],
+      topic: 'general',
     }),
   });
 
   if (!resp.ok) {
     const t = await resp.text().catch(() => '');
-    throw new Error('TAVILY_' + resp.status + ': ' + t.slice(0, 120));
+    throw new Error('TAVILY_' + resp.status + ': ' + t.slice(0, 200));
   }
   return resp.json();
 }
 
-// ── Pages Function handler ────────────────────────────────────────
+// ── Extract issue number from text ───────────────────────────────
+function extractIssue(text) {
+  // Match 7-digit issues like 2026063
+  const matches = [...text.matchAll(/\b(20[23]\d{4})\b/g)]
+    .map(m => parseInt(m[1]))
+    .filter(n => n >= 2020001 && n <= 2035365)
+    .sort((a, b) => b - a);
+  return matches.length ? String(matches[0]) : null;
+}
+
+// ── Extract draw date from text ───────────────────────────────────
+function extractDate(text) {
+  const m = text.match(/(\d{4})[年\-\/](\d{1,2})[月\-\/](\d{1,2})/);
+  if (!m) return '';
+  return `${m[1]}-${m[2].padStart(2,'0')}-${m[3].padStart(2,'0')}`;
+}
+
+// ── Extract ball numbers ──────────────────────────────────────────
+function extractNumbers(text, cfg) {
+  const { redCount, blueCount, redRange, blueRange } = cfg;
+  const isSeq = redRange[0] === 0; // sequential 0-9 games
+
+  let red = [], blue = [];
+
+  if (!isSeq) {
+    // ── Padded number games (ssq / dlt) ──
+    // Try explicit label pattern first
+    if (cfg.name === '双色球') {
+      // "红球：06 11 18 22 28 31 蓝球：12"
+      const m1 = text.match(/红球[号码：:\s]*((?:\d{1,2}[\s,，、]+){5}\d{1,2})/);
+      const m2 = text.match(/蓝球[号码：:\s]*(\d{1,2})/);
+      if (m1) red  = m1[1].match(/\d+/g).map(Number).filter(n => n>=1&&n<=33).slice(0,6);
+      if (m2) blue = [parseInt(m2[1])].filter(n => n>=1&&n<=16);
+
+      // Fallback: "06 11 18 22 28 31 + 12"
+      if (red.length < 6) {
+        const m3 = text.match(/\b(\d{2})\s+(\d{2})\s+(\d{2})\s+(\d{2})\s+(\d{2})\s+(\d{2})\s*[＋+]\s*(\d{2})/);
+        if (m3) {
+          red  = [m3[1],m3[2],m3[3],m3[4],m3[5],m3[6]].map(Number).filter(n=>n>=1&&n<=33);
+          blue = [parseInt(m3[7])].filter(n=>n>=1&&n<=16);
+        }
+      }
+    }
+
+    if (cfg.name === '大乐透') {
+      // "前区：05 11 18 24 33 后区：04 09"
+      const m1 = text.match(/前区[号码：:\s]*((?:\d{1,2}[\s,，、]+){4}\d{1,2})/);
+      const m2 = text.match(/后区[号码：:\s]*((?:\d{1,2}[\s,，、]+)?\d{1,2})/);
+      if (m1) red  = m1[1].match(/\d+/g).map(Number).filter(n=>n>=1&&n<=35).slice(0,5);
+      if (m2) blue = m2[1].match(/\d+/g).map(Number).filter(n=>n>=1&&n<=12).slice(0,2);
+
+      if (red.length < 5) {
+        const m3 = text.match(/\b(\d{2})\s+(\d{2})\s+(\d{2})\s+(\d{2})\s+(\d{2})\s*[＋+]\s*(\d{2})\s+(\d{2})/);
+        if (m3) {
+          red  = [m3[1],m3[2],m3[3],m3[4],m3[5]].map(Number).filter(n=>n>=1&&n<=35);
+          blue = [parseInt(m3[6]),parseInt(m3[7])].filter(n=>n>=1&&n<=12);
+        }
+      }
+    }
+
+  } else {
+    // ── Sequential digit games (qxc/fc3d/p5) ──
+    const nameMap = { '七星彩':'七星彩', '福彩3D':'3D|福彩3D', '排列五':'排列五' };
+    const pat = nameMap[cfg.name] || cfg.name;
+
+    // "七星彩：1 2 3 4 5 6 7" or "开奖号码：12345"
+    const m1 = text.match(new RegExp(
+      '(?:' + pat + '|开奖号码)[^\\d]*([\\d][\\s,，]*' +
+      '[\\d](?:[\\s,，]*[\\d]){' + (redCount-2) + '})'
+    ));
+    if (m1) {
+      const digits = m1[1].match(/\d/g);
+      if (digits && digits.length >= redCount) red = digits.slice(0, redCount).map(Number);
+    }
+
+    // Fallback: find a run of exactly redCount single digits
+    if (red.length < redCount) {
+      const allDigits = [...text.matchAll(/\b(\d)\b/g)].map(m => parseInt(m[1]));
+      if (allDigits.length >= redCount) red = allDigits.slice(0, redCount);
+    }
+  }
+
+  return { red, blue };
+}
+
+// ── Parse Tavily response into structured lottery data ────────────
+function parseLotteryData(cfg, tavilyData, targetIssue) {
+  // Merge answer + all result snippets
+  const chunks = [
+    tavilyData.answer || '',
+    ...(tavilyData.results || []).map(r => (r.title||'') + ' ' + (r.content||'')),
+  ];
+  const fullText = chunks.join('\n');
+
+  // Extract issue
+  let issue = targetIssue
+    ? (fullText.includes(String(targetIssue)) ? String(targetIssue) : extractIssue(fullText))
+    : extractIssue(fullText);
+
+  if (!issue) return null;
+
+  const date = extractDate(fullText);
+  const { red, blue } = extractNumbers(fullText, cfg);
+
+  const minRed = cfg.redCount;
+  const minBlue = cfg.blueCount;
+  if (red.length < minRed || blue.length < minBlue) return null;
+
+  return { issue, date, red: red.slice(0, minRed), blue: blue.slice(0, minBlue) };
+}
+
+// ── Main handler ─────────────────────────────────────────────────
 export async function onRequestPost(context) {
   const { request, env } = context;
 
   const origin  = request.headers.get('Origin') || '';
-  const allowed = env.ALLOWED_ORIGIN || origin || '*';
   const cors = {
-    'Access-Control-Allow-Origin':  allowed,
+    'Access-Control-Allow-Origin':  env.ALLOWED_ORIGIN || origin || '*',
     'Access-Control-Allow-Methods': 'POST, OPTIONS',
     'Access-Control-Allow-Headers': 'Content-Type',
   };
 
   let body;
   try { body = await request.json(); }
-  catch { return json({ error: 'Invalid JSON' }, 400, cors); }
+  catch { return j({ error: 'Invalid JSON' }, 400, cors); }
 
   const { type, issue } = body;
-  if (!type || !['ssq','dlt','qxc','fc3d','p5'].includes(type)) {
-    return json({ error: 'Invalid lottery type' }, 400, cors);
-  }
+  if (!type || !LOTTERY_CONFIG[type]) return j({ error: 'Invalid type' }, 400, cors);
 
   const apiKey = env.TAVILY_API_KEY;
-  if (!apiKey) return json({ error: 'TAVILY_API_KEY not configured' }, 500, cors);
+  if (!apiKey) return j({ error: 'TAVILY_API_KEY not configured' }, 500, cors);
 
-  const query = LOTTERY_QUERIES[type](issue || null);
+  const cfg = LOTTERY_CONFIG[type];
+  const todayBJ = new Date(Date.now() + 8*3600000).toISOString().slice(0,10);
+  const query = issue ? cfg.issueQuery(issue) : cfg.latestQuery(todayBJ);
 
   let tavilyData;
   try { tavilyData = await tavilySearch(apiKey, query); }
-  catch (e) { return json({ error: e.message }, 502, cors); }
+  catch (e) { return j({ error: e.message }, 502, cors); }
 
-  const allResults = [
-    ...(tavilyData.answer  ? [{ title: 'answer', content: tavilyData.answer }] : []),
-    ...(tavilyData.results || []),
-  ];
+  const result = parseLotteryData(cfg, tavilyData, issue || null);
 
-  const extracted = extractLotteryData(type, allResults, issue || null);
-
-  if (!extracted) {
-    // Return raw snippets for debugging
-    return json({
+  if (!result) {
+    // Return debug info so frontend can show a proper message
+    return j({
       error:    'parse_failed',
-      answer:   tavilyData.answer || '',
-      snippets: (tavilyData.results||[]).slice(0,2).map(r=>({
+      query,
+      answer:   (tavilyData.answer || '').slice(0, 200),
+      snippets: (tavilyData.results || []).slice(0, 2).map(r => ({
+        url:     r.url,
         title:   r.title,
-        content: (r.content||'').slice(0, 300),
+        content: (r.content || '').slice(0, 200),
       })),
     }, 200, cors);
   }
 
-  return json(extracted, 200, cors);
+  return j(result, 200, cors);
 }
 
 export async function onRequestOptions() {
@@ -192,7 +247,7 @@ export async function onRequestOptions() {
   });
 }
 
-function json(obj, status, headers) {
+function j(obj, status, headers) {
   return new Response(JSON.stringify(obj), {
     status,
     headers: { ...headers, 'Content-Type': 'application/json' },
