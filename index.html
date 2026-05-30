@@ -1,0 +1,1696 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+<title>彩票随机号码生成器</title>
+<link href="https://fonts.googleapis.com/css2?family=Noto+Serif+SC:wght@400;600;700&family=Space+Mono:wght@400;700&family=Noto+Sans+SC:wght@300;400;500;700&display=swap" rel="stylesheet">
+<style>
+:root {
+  --glass-bg: rgba(255,255,255,0.58);
+  --glass-border: rgba(255,255,255,0.82);
+  --glass-shadow: 0 6px 32px rgba(100,160,120,0.13),0 1.5px 6px rgba(200,120,150,0.07);
+  --text-primary: #2d4a3e;
+  --text-secondary: #5a7a6a;
+  --text-muted: #9dbdac;
+  --spring-stem: #6dbf8e;
+  --ball-size: 36px;
+}
+*{box-sizing:border-box;margin:0;padding:0;-webkit-tap-highlight-color:transparent}
+body{
+  font-family:'Noto Sans SC',sans-serif;min-height:100vh;
+  background:
+    radial-gradient(ellipse at 15% 10%,rgba(252,228,236,.85) 0%,transparent 45%),
+    radial-gradient(ellipse at 85% 5%,rgba(200,237,217,.7) 0%,transparent 40%),
+    radial-gradient(ellipse at 90% 90%,rgba(255,224,178,.6) 0%,transparent 45%),
+    radial-gradient(ellipse at 5% 85%,rgba(200,237,217,.55) 0%,transparent 40%),
+    radial-gradient(ellipse at 50% 50%,rgba(232,245,240,1) 0%,#e4f5ec 100%);
+  color:var(--text-primary);overflow-x:hidden;
+}
+body::before{content:'';position:fixed;border-radius:50%;pointer-events:none;z-index:0;width:320px;height:320px;top:-80px;right:-80px;background:radial-gradient(circle,rgba(248,187,208,.35) 0%,transparent 70%)}
+body::after{content:'';position:fixed;border-radius:50%;pointer-events:none;z-index:0;width:260px;height:260px;bottom:-60px;left:-60px;background:radial-gradient(circle,rgba(168,216,168,.3) 0%,transparent 70%)}
+.wrapper{position:relative;z-index:1;max-width:860px;margin:0 auto;padding:20px 14px 80px;overflow-x:hidden}
+
+/* ── Nav tabs ── */
+.nav-bar{display:flex;justify-content:center;gap:6px;margin-bottom:22px;flex-wrap:wrap}
+.nav-btn{
+  padding:7px 18px;border-radius:100px;border:1.5px solid rgba(100,190,140,.25);
+  background:rgba(255,255,255,.5);color:var(--text-secondary);font-size:.8rem;
+  cursor:pointer;transition:all .18s;font-family:'Noto Sans SC',sans-serif;letter-spacing:.05em;
+}
+.nav-btn:hover{background:rgba(255,255,255,.85);border-color:rgba(100,190,140,.5);color:var(--text-primary)}
+.nav-btn.active{background:rgba(109,191,142,.18);border-color:rgba(109,191,142,.7);color:#1b6b3a;font-weight:500}
+
+/* ── Pages ── */
+.page{display:none}.page.active{display:block}
+
+/* Header */
+.header{text-align:center;margin-bottom:22px}
+.header-deco{font-size:1.5rem;margin-bottom:4px;display:block;letter-spacing:.1em}
+.header-title{
+  font-family:'Noto Serif SC',serif;font-size:clamp(1.4rem,5vw,1.9rem);
+  font-weight:700;letter-spacing:.1em;
+  background:linear-gradient(135deg,#e91e8c 0%,#ff7043 50%,#43a047 100%);
+  -webkit-background-clip:text;-webkit-text-fill-color:transparent;background-clip:text;
+}
+.header-sub{margin-top:5px;font-size:.72rem;color:var(--text-muted);letter-spacing:.16em}
+
+/* Glass */
+.glass{
+  background:var(--glass-bg);
+  backdrop-filter:blur(20px) saturate(1.6);-webkit-backdrop-filter:blur(20px) saturate(1.6);
+  border:1px solid var(--glass-border);border-radius:18px;box-shadow:var(--glass-shadow);
+}
+
+/* Control panel */
+.control-panel{padding:18px 16px;margin-bottom:14px}
+.control-row{display:flex;align-items:center;flex-wrap:wrap;gap:9px 12px;margin-bottom:14px}
+.control-row:last-child{margin-bottom:0}
+.control-label{font-size:.74rem;color:var(--text-secondary);letter-spacing:.08em;min-width:44px;font-weight:500}
+
+/* Type tabs */
+.type-tabs{display:flex;gap:6px;flex-wrap:wrap}
+.type-tab{padding:5px 12px;border-radius:100px;border:1.5px solid rgba(100,180,130,.25);background:rgba(255,255,255,.5);color:var(--text-secondary);font-size:.76rem;cursor:pointer;transition:all .18s;font-family:'Noto Sans SC',sans-serif;letter-spacing:.03em;white-space:nowrap}
+.type-tab:hover{background:rgba(255,255,255,.85);color:var(--text-primary);border-color:rgba(100,180,130,.5)}
+.type-tab.active-sports{background:rgba(255,138,101,.15);border-color:rgba(255,138,101,.6);color:#c94024;font-weight:500}
+.type-tab.active-welfare{background:rgba(240,98,146,.13);border-color:rgba(240,98,146,.55);color:#a0005a;font-weight:500}
+.type-badge{font-size:.58rem;padding:1px 5px;border-radius:4px;margin-left:3px;vertical-align:middle}
+.badge-sports{background:rgba(255,138,101,.18);color:#c94024}
+.badge-welfare{background:rgba(240,98,146,.15);color:#a0005a}
+
+/* Issue row */
+.issue-row{display:flex;align-items:center;gap:8px;flex-wrap:wrap}
+.issue-display{
+  font-family:'Space Mono',monospace;font-size:.82rem;font-weight:700;
+  color:var(--text-primary);padding:4px 12px;border-radius:8px;
+  background:rgba(255,255,255,.65);border:1.5px solid rgba(109,191,142,.35);
+  letter-spacing:.06em;min-width:120px;text-align:center;
+}
+.issue-label{font-size:.65rem;color:var(--text-muted);letter-spacing:.06em}
+
+/* Count */
+.count-group{display:flex;align-items:center;gap:7px}
+.count-btn{width:30px;height:30px;border-radius:50%;border:1.5px solid rgba(100,190,140,.35);background:rgba(255,255,255,.6);color:var(--text-secondary);font-size:1.1rem;cursor:pointer;display:flex;align-items:center;justify-content:center;transition:all .15s;line-height:1}
+.count-btn:hover{background:rgba(255,255,255,.95);border-color:rgba(100,190,140,.65);color:var(--text-primary)}
+.count-btn:active{transform:scale(.9)}
+.count-input{width:46px;text-align:center;background:rgba(255,255,255,.6);border:1.5px solid rgba(100,190,140,.3);border-radius:9px;color:var(--text-primary);font-size:.88rem;padding:4px 3px;font-family:'Space Mono',monospace}
+.count-input:focus{outline:none;border-color:var(--spring-stem);background:rgba(255,255,255,.92)}
+
+/* Generate button */
+.btn-generate{padding:9px 24px;border-radius:100px;border:none;font-family:'Noto Sans SC',sans-serif;font-size:.84rem;font-weight:500;letter-spacing:.09em;cursor:pointer;transition:all .18s}
+.btn-generate.sports{background:linear-gradient(135deg,#ffb74d,#ff7043);color:#fff;box-shadow:0 3px 16px rgba(255,112,67,.3)}
+.btn-generate.welfare{background:linear-gradient(135deg,#f48fb1,#e91e8c);color:#fff;box-shadow:0 3px 16px rgba(233,30,140,.26)}
+.btn-generate:hover{transform:translateY(-1px);filter:brightness(1.06)}
+.btn-generate:active{transform:scale(.97)}
+.lottery-info{font-size:.72rem;color:var(--text-muted);letter-spacing:.04em;line-height:1.6}
+
+/* Section title */
+.section-title{font-size:.78rem;font-weight:500;letter-spacing:.12em;color:var(--text-secondary);margin-bottom:12px;display:flex;align-items:center;gap:7px}
+.section-title-bar{width:3px;height:13px;border-radius:2px}
+.bar-green{background:linear-gradient(180deg,#43a047,#81c784)}
+.bar-orange{background:linear-gradient(180deg,#ff8a65,#ffb74d)}
+.bar-blue{background:linear-gradient(180deg,#42a5f5,#90caf9)}
+
+/* History */
+.history-panel{padding:18px 16px;margin-bottom:14px}
+.history-empty{text-align:center;padding:28px 10px;color:var(--text-muted);font-size:.78rem;letter-spacing:.08em}
+.history-list{display:flex;flex-direction:column;gap:10px}
+
+/* History card */
+.history-card{
+  background:rgba(255,255,255,.5);border:1px solid rgba(200,237,217,.7);
+  border-radius:14px;padding:13px 14px;position:relative;overflow:visible;
+  transition:opacity .25s,filter .25s;
+}
+.history-card::before{content:'';position:absolute;top:0;left:0;right:0;height:2.5px;border-radius:14px 14px 0 0}
+.history-card.sports::before{background:linear-gradient(90deg,#ffb74d,#ff7043)}
+.history-card.welfare::before{background:linear-gradient(90deg,#f48fb1,#e91e8c)}
+.history-card::after{content:'🌸';position:absolute;right:10px;bottom:6px;font-size:1.8rem;opacity:.07;pointer-events:none}
+.history-card.sports::after{content:'🌼'}
+.history-card.query-dimmed{opacity:.35;filter:grayscale(.4);pointer-events:none}
+
+.hcard-header{display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:10px;gap:6px}
+.hcard-meta{display:flex;align-items:center;gap:6px;flex-wrap:wrap;flex:1}
+.hcard-badge{font-size:.63rem;padding:2px 7px;border-radius:4px;font-weight:500;letter-spacing:.07em;flex-shrink:0}
+.hcard-badge.sports{background:rgba(255,138,101,.18);color:#c94024;border:1px solid rgba(255,138,101,.3)}
+.hcard-badge.welfare{background:rgba(240,98,146,.15);color:#a0005a;border:1px solid rgba(240,98,146,.28)}
+.hcard-name{font-size:.76rem;color:var(--text-secondary)}
+.hcard-issue{
+  font-family:'Space Mono',monospace;font-size:.68rem;font-weight:700;
+  color:#1b6b3a;background:rgba(109,191,142,.15);border:1px solid rgba(109,191,142,.35);
+  padding:1px 7px;border-radius:5px;letter-spacing:.05em;white-space:nowrap;
+}
+.hcard-time{font-size:.63rem;color:var(--text-muted);font-family:'Space Mono',monospace;white-space:nowrap}
+.hcard-drawdate{font-size:.63rem;color:#0277bd;background:rgba(2,119,189,.08);border:1px solid rgba(2,119,189,.2);padding:1px 7px;border-radius:5px;white-space:nowrap}
+.hcard-actions{display:flex;gap:5px;align-items:center;flex-shrink:0}
+
+/* Draw status badge */
+.draw-status{
+  font-size:.63rem;padding:2px 8px;border-radius:100px;
+  font-weight:500;white-space:nowrap;cursor:pointer;transition:all .15s;
+  display:inline-flex;align-items:center;gap:4px;
+}
+.draw-status.pending{background:rgba(255,193,7,.12);border:1px solid rgba(255,193,7,.4);color:#b8860b}
+.draw-status.drawn{background:rgba(67,160,71,.1);border:1px solid rgba(67,160,71,.35);color:#2e7d32}
+.draw-status.loading{background:rgba(100,180,255,.1);border:1px solid rgba(100,180,255,.35);color:#0277bd;pointer-events:none}
+.draw-status.won{background:rgba(233,30,140,.12);border:1px solid rgba(233,30,140,.4);color:#a0005a;animation:pulse 1.5s infinite}
+@keyframes pulse{0%,100%{box-shadow:0 0 0 0 rgba(233,30,140,.3)}50%{box-shadow:0 0 0 4px rgba(233,30,140,0)}}
+
+/* Draw result row */
+.draw-result-row{
+  display:flex;align-items:center;gap:6px;flex-wrap:wrap;
+  padding:8px 10px;border-radius:10px;margin-bottom:8px;
+  background:rgba(232,245,233,.6);border:1px solid rgba(109,191,142,.25);
+}
+.draw-result-label{font-size:.63rem;color:var(--text-muted);letter-spacing:.05em;min-width:40px}
+.draw-result-date{font-size:.65rem;color:var(--text-secondary);letter-spacing:.03em}
+
+.btn-query{padding:4px 11px;border-radius:100px;font-size:.7rem;cursor:pointer;transition:all .15s;border:1.5px solid rgba(67,160,71,.4);background:rgba(67,160,71,.08);color:#2e7d32;font-family:'Noto Sans SC',sans-serif;font-weight:500}
+.btn-query:hover{background:rgba(67,160,71,.18)}
+.btn-query.active{background:rgba(67,160,71,.2);border-color:rgba(67,160,71,.7)}
+.btn-delete{width:26px;height:26px;border-radius:50%;border:1.5px solid rgba(200,100,100,.28);background:rgba(255,255,255,.5);color:rgba(180,80,80,.6);font-size:.75rem;cursor:pointer;display:flex;align-items:center;justify-content:center;transition:all .15s}
+.btn-delete:hover{background:rgba(255,220,220,.5);border-color:rgba(200,80,80,.5);color:#c62828}
+
+/* Ticket rows */
+.hcard-tickets{display:flex;flex-direction:column;gap:7px}
+.ticket-row-wrap{overflow-x:auto;overflow-y:visible;scrollbar-width:none;padding:4px 2px;margin:-4px -2px}
+.ticket-row-wrap::-webkit-scrollbar{display:none}
+.ticket-row{display:flex;align-items:center;gap:6px;flex-wrap:nowrap;overflow:visible}
+.ticket-row-num{font-size:.62rem;color:var(--text-muted);font-family:'Space Mono',monospace;min-width:28px;flex-shrink:0}
+.balls-inline{display:flex;align-items:center;gap:5px;flex-wrap:nowrap;flex-shrink:0}
+.row-sep{width:1px;height:20px;background:rgba(100,180,130,.25);margin:0 2px;flex-shrink:0}
+.row-prize{font-size:.62rem;padding:2px 8px;border-radius:100px;flex-shrink:0;background:rgba(67,160,71,.1);border:1px solid rgba(67,160,71,.35);color:#2e7d32;font-weight:500;display:none;white-space:nowrap}
+
+/* Ball */
+.ball{
+  width:var(--ball-size);height:var(--ball-size);border-radius:50%;
+  display:flex;align-items:center;justify-content:center;
+  font-family:'Space Mono',monospace;font-size:.76rem;font-weight:700;
+  cursor:pointer;transition:transform .12s,box-shadow .12s,opacity .2s;
+  user-select:none;border:none;outline:none;flex-shrink:0;
+  -webkit-tap-highlight-color:transparent;position:relative;
+}
+.ball:hover{transform:scale(1.1);z-index:1}
+.ball:active{transform:scale(.93)}
+.ball.red{background:radial-gradient(circle at 38% 35%,#ff8a80,#e53935);color:#fff;box-shadow:0 2px 8px rgba(229,57,53,.35)}
+.ball.blue{background:radial-gradient(circle at 38% 35%,#80d8ff,#0288d1);color:#fff;box-shadow:0 2px 8px rgba(2,136,209,.32)}
+.ball.editing{background:rgba(255,255,255,.9)!important;box-shadow:0 0 0 2px var(--spring-stem)!important;color:var(--text-primary)!important}
+.ball input{width:100%;height:100%;background:transparent;border:none;outline:none;text-align:center;font-family:'Space Mono',monospace;font-size:.76rem;font-weight:700;color:inherit;padding:0}
+.ball.matched{box-shadow:0 0 0 2.5px #43a047,0 2px 12px rgba(67,160,71,.45)!important;transform:scale(1.1)}
+.ball.not-matched{opacity:.28;transform:scale(.9)}
+@keyframes ballPop{0%{transform:scale(.2);opacity:0}65%{transform:scale(1.12)}100%{transform:scale(1);opacity:1}}
+.ball-anim{animation:ballPop .25s ease both}
+
+/* Checker */
+.checker-panel{padding:16px 16px;margin-bottom:14px}
+.win-balls-row{display:flex;align-items:center;gap:5px;flex-wrap:wrap;margin-bottom:12px}
+.win-ball-label{font-size:.62rem;min-width:24px;letter-spacing:.04em}
+.win-ball-label.lbl-red{color:rgba(200,60,60,.8)}
+.win-ball-label.lbl-blue{color:rgba(2,119,189,.8)}
+.win-ball-label.lbl-seq{color:var(--text-muted)}
+.win-ball-input{
+  width:var(--ball-size);height:var(--ball-size);border-radius:50%;
+  background:rgba(255,255,255,.55);border:1.5px dashed rgba(100,190,140,.45);
+  color:var(--text-primary);text-align:center;font-family:'Space Mono',monospace;
+  font-size:.76rem;font-weight:700;outline:none;transition:all .18s;-webkit-appearance:none;
+}
+.win-ball-input:focus{border-color:var(--spring-stem);background:rgba(255,255,255,.92);border-style:solid}
+.win-ball-input.lbl-red.filled{background:rgba(229,57,53,.08);border-color:rgba(229,57,53,.5);border-style:solid;color:#c62828}
+.win-ball-input.lbl-blue.filled{background:rgba(2,136,209,.08);border-color:rgba(2,136,209,.5);border-style:solid;color:#01579b}
+.win-ball-input.lbl-seq.filled{background:rgba(67,160,71,.07);border-color:rgba(67,160,71,.45);border-style:solid;color:#2e7d32}
+.row-sep-check{width:1px;height:22px;background:rgba(100,180,130,.25);margin:0 3px}
+.checker-row{display:flex;align-items:center;flex-wrap:wrap;gap:8px}
+.btn-check{padding:7px 18px;border-radius:100px;border:1.5px solid rgba(67,160,71,.45);background:rgba(67,160,71,.1);color:#2e7d32;font-family:'Noto Sans SC',sans-serif;font-size:.78rem;letter-spacing:.08em;cursor:pointer;transition:all .15s;font-weight:500}
+.btn-check:hover{background:rgba(67,160,71,.2)}
+.btn-check:active{transform:scale(.95)}
+.btn-secondary{padding:7px 14px;border-radius:100px;border:1.5px solid rgba(100,180,130,.2);background:transparent;color:var(--text-muted);font-family:'Noto Sans SC',sans-serif;font-size:.76rem;cursor:pointer;transition:all .15s}
+.btn-secondary:hover{border-color:rgba(100,180,130,.4);color:var(--text-secondary)}
+.prize-result{margin-top:10px;padding:11px 13px;border-radius:11px;display:none;background:rgba(232,245,233,.7);border:1px solid rgba(67,160,71,.22);font-size:.78rem;color:var(--text-secondary);line-height:1.9}
+.prize-result.visible{display:block}
+.prize-line{display:flex;justify-content:space-between;align-items:center;padding:1px 0}
+.prize-amount{color:#2e7d32;font-family:'Space Mono',monospace;font-weight:700}
+.no-win{color:var(--text-muted);text-align:center;padding:3px 0;letter-spacing:.1em}
+.total-line{margin-top:6px;padding-top:6px;border-top:1px solid rgba(67,160,71,.2);display:flex;justify-content:space-between;color:var(--text-primary);font-weight:500}
+
+/* Bottom toolbar */
+.card-footer{display:flex;align-items:center;gap:7px;margin-top:10px;flex-wrap:wrap}
+.btn-small{padding:5px 12px;border-radius:100px;border:1.5px solid rgba(100,190,140,.3);background:rgba(255,255,255,.55);color:var(--text-secondary);font-size:.7rem;letter-spacing:.04em;cursor:pointer;transition:all .15s;font-family:'Noto Sans SC',sans-serif}
+.btn-small:hover{background:rgba(255,255,255,.88);border-color:rgba(100,190,140,.55);color:var(--text-primary)}
+
+/* ── Help page ── */
+.help-panel{padding:22px 20px;margin-bottom:14px}
+.help-section{margin-bottom:28px}
+.help-section:last-child{margin-bottom:0}
+.help-h2{
+  font-family:'Noto Serif SC',serif;font-size:1rem;font-weight:600;
+  color:var(--text-primary);margin-bottom:14px;
+  display:flex;align-items:center;gap:8px;letter-spacing:.06em;
+}
+.help-h2 .help-icon{font-size:1.1rem}
+.help-steps{display:flex;flex-direction:column;gap:10px}
+.help-step{
+  display:flex;gap:12px;align-items:flex-start;
+  padding:11px 14px;border-radius:12px;
+  background:rgba(255,255,255,.5);border:1px solid rgba(200,237,217,.6);
+}
+.help-step-num{
+  width:22px;height:22px;border-radius:50%;flex-shrink:0;
+  display:flex;align-items:center;justify-content:center;
+  font-size:.65rem;font-weight:700;font-family:'Space Mono',monospace;margin-top:1px;
+}
+.step-green{background:rgba(67,160,71,.15);color:#2e7d32}
+.step-orange{background:rgba(255,138,101,.18);color:#c94024}
+.step-blue{background:rgba(2,136,209,.12);color:#0277bd}
+.step-pink{background:rgba(240,98,146,.15);color:#a0005a}
+.help-step-body{flex:1}
+.help-step-title{font-size:.8rem;font-weight:500;color:var(--text-primary);margin-bottom:3px;letter-spacing:.03em}
+.help-step-desc{font-size:.73rem;color:var(--text-secondary);line-height:1.7;letter-spacing:.02em}
+.help-note{
+  margin-top:10px;padding:10px 14px;border-radius:10px;
+  background:rgba(255,193,7,.08);border:1px solid rgba(255,193,7,.3);
+  font-size:.72rem;color:#7a6200;line-height:1.7;
+}
+.help-note::before{content:'💡 ';font-size:.8rem}
+.help-divider{height:1px;background:rgba(100,180,130,.15);margin:4px 0 18px}
+.lottery-types-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(200px,1fr));gap:8px;margin-top:8px}
+.lottery-type-card{
+  padding:10px 13px;border-radius:11px;
+  background:rgba(255,255,255,.5);border:1px solid rgba(200,237,217,.6);
+}
+.ltc-name{font-size:.8rem;font-weight:500;color:var(--text-primary);margin-bottom:3px;display:flex;align-items:center;gap:6px}
+.ltc-badge{font-size:.58rem;padding:1px 6px;border-radius:4px}
+.ltc-desc{font-size:.7rem;color:var(--text-secondary);line-height:1.5}
+
+/* ── Prize notification modal ── */
+.modal-overlay{
+  position:fixed;inset:0;z-index:1000;
+  background:rgba(40,80,50,.35);backdrop-filter:blur(8px);
+  display:flex;align-items:center;justify-content:center;padding:20px;
+}
+.modal-overlay.hidden{display:none}
+.modal-box{
+  background:rgba(255,255,255,.96);border-radius:22px;
+  box-shadow:0 16px 60px rgba(40,100,60,.22);
+  padding:28px 24px;max-width:400px;width:100%;
+  border:1px solid rgba(200,237,217,.8);
+  animation:modalIn .3s ease;
+}
+@keyframes modalIn{from{transform:scale(.88);opacity:0}to{transform:scale(1);opacity:1}}
+.modal-icon{text-align:center;font-size:2.8rem;margin-bottom:10px}
+.modal-title{text-align:center;font-family:'Noto Serif SC',serif;font-size:1.2rem;font-weight:700;color:var(--text-primary);margin-bottom:8px;letter-spacing:.08em}
+.modal-desc{text-align:center;font-size:.8rem;color:var(--text-secondary);line-height:1.8;margin-bottom:18px}
+.modal-records{display:flex;flex-direction:column;gap:7px;margin-bottom:18px;max-height:200px;overflow-y:auto}
+.modal-record{
+  padding:9px 13px;border-radius:10px;
+  background:rgba(232,245,233,.7);border:1px solid rgba(67,160,71,.25);
+  font-size:.76rem;color:var(--text-secondary);line-height:1.6;
+}
+.modal-record strong{color:#2e7d32}
+.modal-btn{
+  width:100%;padding:11px;border-radius:100px;border:none;
+  background:linear-gradient(135deg,#6dbf8e,#43a047);color:#fff;
+  font-family:'Noto Sans SC',sans-serif;font-size:.88rem;font-weight:500;
+  letter-spacing:.1em;cursor:pointer;transition:all .18s;
+}
+.modal-btn:hover{filter:brightness(1.06)}
+
+/* Fullscreen */
+.fullscreen-overlay{position:fixed;inset:0;z-index:999;background:rgba(232,248,240,.97);backdrop-filter:blur(24px);display:none;flex-direction:column;align-items:center;overflow-y:auto}
+.fullscreen-overlay.open{display:flex}
+.fullscreen-inner{width:100%;max-width:740px;padding:24px 16px 60px}
+.fullscreen-header{display:flex;justify-content:space-between;align-items:center;margin-bottom:18px}
+.fullscreen-title{font-family:'Noto Serif SC',serif;font-size:1.1rem;letter-spacing:.1em;color:var(--text-primary)}
+.btn-close-fs{width:34px;height:34px;border-radius:50%;border:1.5px solid rgba(100,190,140,.3);background:rgba(255,255,255,.7);color:var(--text-secondary);font-size:.95rem;cursor:pointer;display:flex;align-items:center;justify-content:center;transition:all .15s}
+.btn-close-fs:hover{background:rgba(255,255,255,.95);color:var(--text-primary)}
+.fullscreen-text{background:rgba(255,255,255,.62);border:1px solid rgba(200,237,217,.8);border-radius:14px;padding:16px 18px;font-family:'Space Mono',monospace;font-size:.82rem;line-height:1.6;color:var(--text-secondary);overflow-x:auto}
+.fullscreen-text span{white-space:nowrap}
+.fs-type-s{color:#c94024}.fs-type-w{color:#a0005a}.fs-nums{color:var(--text-primary)}.fs-sep{color:var(--text-muted)}.fs-blue{color:#0277bd}
+
+/* ── Mobile overrides ── */
+@media(max-width:480px){
+  :root{--ball-size:30px}
+  .wrapper{padding:12px 10px 60px;overflow-x:hidden}
+
+  /* nav */
+  .nav-bar{gap:5px}
+  .nav-btn{padding:5px 12px;font-size:.72rem;letter-spacing:.02em}
+
+  /* panels */
+  .control-panel,.history-panel,.checker-panel,.help-panel{padding:13px 11px}
+
+  /* control rows */
+  .control-row{gap:6px 8px;margin-bottom:11px;flex-wrap:wrap}
+  .control-label{min-width:32px;font-size:.68rem}
+
+  /* type tabs — allow horizontal scroll instead of overflow */
+  .type-tabs{flex-wrap:nowrap;overflow-x:auto;padding-bottom:3px;-webkit-overflow-scrolling:touch;scrollbar-width:none;max-width:100%}
+  .type-tabs::-webkit-scrollbar{display:none}
+  .type-tab{padding:4px 9px;font-size:.7rem;flex-shrink:0}
+  .type-badge{display:none}
+
+  /* generate button full-width on its own row */
+  .btn-generate{width:100%;padding:9px 0;font-size:.8rem;text-align:center}
+  .control-row:has(.btn-generate){flex-direction:column;align-items:stretch}
+  .control-row:has(.btn-generate) .count-group{justify-content:center}
+
+  /* issue display */
+  .issue-display{font-size:.76rem;min-width:90px}
+  .issue-row{flex-wrap:wrap;gap:5px}
+  .issue-label{font-size:.62rem}
+
+  /* history cards */
+  .hcard-header{flex-direction:column;align-items:flex-start;gap:7px}
+  .hcard-meta{width:100%;flex-wrap:wrap}
+  .hcard-actions{width:100%;justify-content:flex-end}
+  .hcard-badge{font-size:.6rem;padding:1px 6px}
+  .hcard-name{font-size:.72rem}
+  .hcard-issue{font-size:.62rem;padding:1px 5px}
+  .hcard-time{font-size:.6rem}
+  .hcard-drawdate{font-size:.6rem;padding:1px 5px}
+
+  /* balls */
+  .ball{font-size:.65rem}
+  .ticket-row-wrap{margin:-3px -1px;padding:3px 1px}
+
+  /* checker / win inputs */
+  .win-balls-row{gap:4px;overflow-x:auto;flex-wrap:nowrap;-webkit-overflow-scrolling:touch;scrollbar-width:none;padding-bottom:3px}
+  .win-balls-row::-webkit-scrollbar{display:none}
+  .win-ball-input{font-size:.65rem;flex-shrink:0}
+  .checker-row{gap:6px}
+  .btn-check,.btn-secondary{padding:6px 13px;font-size:.74rem}
+
+  /* help */
+  .help-step{gap:9px;padding:9px 10px}
+  .lottery-types-grid{grid-template-columns:1fr 1fr}
+
+  /* modal */
+  .modal-box{padding:20px 16px;margin:10px}
+  .modal-box *{font-size:.85em}
+
+  /* fullscreen */
+  .fullscreen-inner{padding:18px 10px 50px}
+  .fullscreen-text{padding:12px 10px;font-size:.74rem}
+}
+
+@media(max-width:360px){
+  :root{--ball-size:26px}
+  .ball{font-size:.6rem}
+  .lottery-types-grid{grid-template-columns:1fr}
+  .nav-btn{padding:5px 10px;font-size:.68rem}
+}
+::-webkit-scrollbar{width:4px;height:4px}
+::-webkit-scrollbar-track{background:transparent}
+::-webkit-scrollbar-thumb{background:rgba(100,180,130,.3);border-radius:2px}
+input[type=number]::-webkit-inner-spin-button,
+input[type=number]::-webkit-outer-spin-button{-webkit-appearance:none;margin:0}
+input[type=number]{-moz-appearance:textfield}
+</style>
+</head>
+<body>
+<div class="wrapper">
+  <!-- Header -->
+  <div class="header">
+    <span class="header-deco">🌸🌼🌿</span>
+    <div class="header-title">彩票号码生成器</div>
+    <div class="header-sub">LOTTERY · 随机生成 · 期次绑定 · 开奖查询</div>
+  </div>
+
+  <!-- Nav -->
+  <div class="nav-bar">
+    <button class="nav-btn active" data-page="main">🎲 生成 &amp; 历史</button>
+    <button class="nav-btn" data-page="help">📖 使用说明</button>
+  </div>
+
+  <!-- Main page -->
+  <div class="page active" id="page-main">
+    <!-- Control Panel -->
+    <div class="glass control-panel">
+      <div class="control-row">
+        <span class="control-label">类型</span>
+        <div class="type-tabs" id="typeTabs"></div>
+      </div>
+      <div class="control-row">
+        <span class="control-label"></span>
+        <span class="lottery-info" id="lotteryInfoText"></span>
+      </div>
+      <div class="control-row">
+        <span class="control-label">期次</span>
+        <div class="issue-row">
+          <div class="issue-display" id="issueDisplay">计算中…</div>
+          <span class="issue-label" id="issueLabel">正在获取…</span>
+        </div>
+      </div>
+      <div class="control-row">
+        <span class="control-label">注数</span>
+        <div class="count-group">
+          <button class="count-btn" id="countMinus">−</button>
+          <input type="number" class="count-input" id="countInput" value="5" min="1" max="20">
+          <button class="count-btn" id="countPlus">+</button>
+        </div>
+        <button class="btn-generate sports" id="btnGenerate">🎲 随机生成</button>
+      </div>
+      <div class="control-row" id="priceHintRow" style="display:none">
+        <span class="control-label"></span>
+        <span id="priceHint" style="font-size:.72rem;color:#2e7d32;letter-spacing:.04em;background:rgba(67,160,71,.08);border:1px solid rgba(67,160,71,.2);border-radius:8px;padding:3px 11px;"></span>
+      </div>
+    </div>
+
+    <!-- History -->
+    <div class="glass history-panel" id="historyPanel">
+      <div class="section-title">
+        <span class="section-title-bar bar-orange"></span>
+        历史记录
+        <span id="historyCount" style="font-size:.68rem;color:var(--text-muted);font-weight:400;margin-left:2px"></span>
+      </div>
+      <div class="history-list" id="historyList">
+        <div class="history-empty" id="historyEmpty">
+          <span style="display:block;font-size:2rem;margin-bottom:6px;opacity:.4">🌱</span>
+          暂无记录，点击「随机生成」开始
+        </div>
+      </div>
+    </div>
+
+    <!-- Checker -->
+    <div class="glass checker-panel" id="checkerPanel" style="display:none">
+      <div class="section-title">
+        <span class="section-title-bar bar-green"></span>
+        中奖查询
+        <span id="checkerTitle" style="font-size:.68rem;color:var(--text-muted);font-weight:400;margin-left:2px"></span>
+      </div>
+      <div class="win-balls-row" id="winBallsRow"></div>
+      <div class="checker-row">
+        <button class="btn-check" id="btnCheck">✓ 开始查询</button>
+        <button class="btn-secondary" id="btnClearCheck">清除结果</button>
+        <button class="btn-secondary" id="btnCloseChecker" style="color:rgba(180,80,80,.6)">收起</button>
+      </div>
+      <div class="prize-result" id="prizeResult"></div>
+    </div>
+  </div>
+
+  <!-- Help page -->
+  <div class="page" id="page-help">
+    <div class="glass help-panel">
+
+      <div class="help-section">
+        <div class="help-h2"><span class="help-icon">🎯</span>支持的彩票类型</div>
+        <div class="lottery-types-grid" id="helpLotteryTypes"></div>
+      </div>
+
+      <div class="help-divider"></div>
+
+      <div class="help-section">
+        <div class="help-h2"><span class="help-icon">🎲</span>生成随机号码</div>
+        <div class="help-steps">
+          <div class="help-step">
+            <div class="help-step-num step-green">1</div>
+            <div class="help-step-body">
+              <div class="help-step-title">选择彩票类型</div>
+              <div class="help-step-desc">在顶部标签栏点击要购买的彩票种类，如「双色球」「大乐透」。页面会自动显示该彩票的规则说明与当前期次。</div>
+            </div>
+          </div>
+          <div class="help-step">
+            <div class="help-step-num step-green">2</div>
+            <div class="help-step-body">
+              <div class="help-step-title">自动获取当前期次</div>
+              <div class="help-step-desc">选择彩票类型后，系统通过 Tavily 搜索获取该彩票最新一期的真实开奖期次，自动推算出当前在售期次显示在「期次」栏。期次以实际购票时彩票站显示为准。</div>
+            </div>
+          </div>
+          <div class="help-step">
+            <div class="help-step-num step-green">3</div>
+            <div class="help-step-body">
+              <div class="help-step-title">设置注数并生成</div>
+              <div class="help-step-desc">用「−/+」按钮调整注数（1–20注），点击「🎲 随机生成」即可一键生成号码。算法采用 Fisher-Yates 洗牌 + crypto 随机源，每个号码独立随机。</div>
+            </div>
+          </div>
+          <div class="help-step">
+            <div class="help-step-num step-green">4</div>
+            <div class="help-step-body">
+              <div class="help-step-title">手动修改号码（可选）</div>
+              <div class="help-step-desc">点击任意球号即可进入编辑模式，输入你想要的数字后按回车或点击空白处确认。系统会自动校验范围并避免重复号码。</div>
+            </div>
+          </div>
+        </div>
+        <div class="help-note">每次生成的号码会自动保存到历史记录，刷新页面也不会丢失。</div>
+      </div>
+
+      <div class="help-divider"></div>
+
+      <div class="help-section">
+        <div class="help-h2"><span class="help-icon">🔍</span>查询开奖结果</div>
+        <div class="help-steps">
+          <div class="help-step">
+            <div class="help-step-num step-blue">1</div>
+            <div class="help-step-body">
+              <div class="help-step-title">点击「查询开奖」</div>
+              <div class="help-step-desc">每张历史卡片右上角有开奖状态标签（⏳ 查询开奖）。点击后，系统通过 Tavily 实时搜索该期的开奖结果，并在卡片内显示开奖号码和日期。</div>
+            </div>
+          </div>
+          <div class="help-step">
+            <div class="help-step-num step-blue">2</div>
+            <div class="help-step-body">
+              <div class="help-step-title">自动高亮命中号码</div>
+              <div class="help-step-desc">查询成功后，开奖号码自动填入下方中奖查询框，你的号码中命中的显示绿色发光效果，未命中的变为灰暗，每注的中奖等级同步显示。</div>
+            </div>
+          </div>
+          <div class="help-step">
+            <div class="help-step-num step-blue">3</div>
+            <div class="help-step-body">
+              <div class="help-step-title">手动输入号码核对</div>
+              <div class="help-step-desc">也可点击「🔍 中奖查询」按钮，在输入框中手动填写开奖号码，点击「✓ 开始查询」查看每注中奖情况和合计奖金估算。</div>
+            </div>
+          </div>
+        </div>
+        <div class="help-note">开奖查询时，其他期次的卡片会自动变暗，聚焦当前查询。结果会保存在本地，刷新页面后可恢复。</div>
+      </div>
+
+      <div class="help-divider"></div>
+
+      <div class="help-section">
+        <div class="help-h2"><span class="help-icon">🔔</span>中奖提醒</div>
+        <div class="help-steps">
+          <div class="help-step">
+            <div class="help-step-num step-pink">1</div>
+            <div class="help-step-body">
+              <div class="help-step-title">进入页面自动检测</div>
+              <div class="help-step-desc">每次打开或刷新页面，系统会自动扫描所有历史记录。如发现有已开奖且中奖的号码（通过自动查询确认），会立即弹窗提醒，显示具体期次和奖项。</div>
+            </div>
+          </div>
+          <div class="help-step">
+            <div class="help-step-num step-pink">2</div>
+            <div class="help-step-body">
+              <div class="help-step-title">查看详情</div>
+              <div class="help-step-desc">弹窗会列出所有中奖记录，点击「查看详情」按钮后弹窗关闭，页面自动定位到对应的历史记录卡片。</div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <div class="help-divider"></div>
+
+      <div class="help-section">
+        <div class="help-h2"><span class="help-icon">📋</span>其他功能</div>
+        <div class="help-steps">
+          <div class="help-step">
+            <div class="help-step-num step-orange">•</div>
+            <div class="help-step-body">
+              <div class="help-step-title">全屏查看号码</div>
+              <div class="help-step-desc">每张历史记录卡片底部有「📋 全屏查看」按钮，点击后以大字清晰展示该期所有号码，方便截图或对照购票。</div>
+            </div>
+          </div>
+          <div class="help-step">
+            <div class="help-step-num step-orange">•</div>
+            <div class="help-step-body">
+              <div class="help-step-title">删除历史记录</div>
+              <div class="help-step-desc">点击卡片右上角的「✕」按钮可删除该期记录。删除后无法恢复，请谨慎操作。</div>
+            </div>
+          </div>
+          <div class="help-step">
+            <div class="help-step-num step-orange">•</div>
+            <div class="help-step-body">
+              <div class="help-step-title">本地存储</div>
+              <div class="help-step-desc">所有历史记录保存在浏览器本地（localStorage），不上传任何服务器。清除浏览器缓存会导致记录丢失，建议截图保存重要号码。</div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+    </div>
+  </div>
+</div>
+
+<!-- Prize notification modal -->
+<div class="modal-overlay hidden" id="prizeModal">
+  <div class="modal-box">
+    <div class="modal-icon">🎉</div>
+    <div class="modal-title">恭喜！您有中奖记录</div>
+    <div class="modal-desc">以下期次已确认中奖，请及时兑奖！</div>
+    <div class="modal-records" id="modalRecords"></div>
+    <button class="modal-btn" id="modalBtn">好的，查看详情</button>
+  </div>
+</div>
+
+<!-- Fullscreen -->
+<div class="fullscreen-overlay" id="fullscreenOverlay">
+  <div class="fullscreen-inner">
+    <div class="fullscreen-header">
+      <span class="fullscreen-title">🌸 号码一览</span>
+      <button class="btn-close-fs" id="btnCloseFs">✕</button>
+    </div>
+    <div class="fullscreen-text" id="fullscreenText"></div>
+  </div>
+</div>
+
+<script>
+// ─────────────────────────────────────────────
+// Lottery configs
+// ─────────────────────────────────────────────
+const LOTTERIES = {
+  ssq:{
+    name:'双色球',type:'welfare',label:'福彩',
+    desc:'前区 1-33 选6红球 + 后区 1-16 选1蓝球',
+    drawDays:[1,3,6], // Mon(1) Wed(3) Sat(6)
+    drawDayNames:'每周一、三、六开奖',
+    pricePerTicket:2,
+    apiCode:'ssq',
+    red:{count:6,min:1,max:33,unique:true},
+    blue:{count:1,min:1,max:16,unique:true},
+    prizes:[
+      {name:'一等奖',check:(r,b,wr,wb)=>mc(r,wr)===6&&wb.includes(b[0]),amount:5000000},
+      {name:'二等奖',check:(r,b,wr,wb)=>mc(r,wr)===6&&!wb.includes(b[0]),amount:200000},
+      {name:'三等奖',check:(r,b,wr,wb)=>mc(r,wr)===5&&wb.includes(b[0]),amount:3000},
+      {name:'四等奖',check:(r,b,wr,wb)=>(mc(r,wr)===5&&!wb.includes(b[0]))||(mc(r,wr)===4&&wb.includes(b[0])),amount:200},
+      {name:'五等奖',check:(r,b,wr,wb)=>(mc(r,wr)===4&&!wb.includes(b[0]))||(mc(r,wr)===3&&wb.includes(b[0])),amount:10},
+      {name:'六等奖',check:(r,b,wr,wb)=>wb.includes(b[0])&&mc(r,wr)<3,amount:5},
+    ]
+  },
+  dlt:{
+    name:'大乐透',type:'sports',label:'体彩',
+    desc:'前区 1-35 选5 + 后区 1-12 选2',
+    drawDays:[1,3,6], // Mon(1) Wed(3) Sat(6)
+    drawDayNames:'每周一、三、六开奖',
+    pricePerTicket:2,
+    apiCode:'dlt',
+    red:{count:5,min:1,max:35,unique:true},
+    blue:{count:2,min:1,max:12,unique:true},
+    prizes:[
+      {name:'一等奖',check:(r,b,wr,wb)=>mc(r,wr)===5&&mc(b,wb)===2,amount:10000000},
+      {name:'二等奖',check:(r,b,wr,wb)=>mc(r,wr)===5&&mc(b,wb)===1,amount:500000},
+      {name:'三等奖',check:(r,b,wr,wb)=>mc(r,wr)===5&&mc(b,wb)===0,amount:10000},
+      {name:'四等奖',check:(r,b,wr,wb)=>mc(r,wr)===4&&mc(b,wb)===2,amount:3000},
+      {name:'五等奖',check:(r,b,wr,wb)=>mc(r,wr)===4&&mc(b,wb)===1,amount:300},
+      {name:'六等奖',check:(r,b,wr,wb)=>(mc(r,wr)===4&&mc(b,wb)===0)||(mc(r,wr)===3&&mc(b,wb)===2),amount:200},
+      {name:'七等奖',check:(r,b,wr,wb)=>(mc(r,wr)===3&&mc(b,wb)===1)||(mc(r,wr)===2&&mc(b,wb)===2),amount:100},
+      {name:'八等奖',check:(r,b,wr,wb)=>(mc(r,wr)===3&&mc(b,wb)===0)||(mc(r,wr)===1&&mc(b,wb)===2)||(mc(r,wr)===2&&mc(b,wb)===1)||(mc(r,wr)===0&&mc(b,wb)===2),amount:15},
+    ]
+  },
+  qxc:{
+    name:'七星彩',type:'sports',label:'体彩',
+    desc:'7个位置各选0-9，顺序匹配',
+    drawDays:[0,2,4], // Sun(0) Tue(2) Thu(4)
+    drawDayNames:'每周日、二、四开奖',
+    pricePerTicket:2,
+    apiCode:'qxc',
+    seq:true,
+    red:{count:7,min:0,max:9,unique:false},
+    blue:{count:0,min:0,max:0,unique:false},
+    prizes:[
+      {name:'一等奖',check:(r,b,wr)=>r.join('')===wr.join(''),amount:5000000},
+      {name:'二等奖',check:(r,b,wr)=>r.slice(0,6).join('')===wr.slice(0,6).join(''),amount:100000},
+      {name:'三等奖',check:(r,b,wr)=>r.slice(0,5).join('')===wr.slice(0,5).join(''),amount:1000},
+      {name:'四等奖',check:(r,b,wr)=>r.slice(0,4).join('')===wr.slice(0,4).join(''),amount:100},
+      {name:'五等奖',check:(r,b,wr)=>r.slice(0,3).join('')===wr.slice(0,3).join(''),amount:10},
+      {name:'六等奖',check:(r,b,wr)=>r[r.length-1]===wr[wr.length-1],amount:5},
+    ]
+  },
+  fc3d:{
+    name:'福彩3D',type:'welfare',label:'福彩',
+    desc:'3个位置各选0-9，直选/组选',
+    drawDays:[0,1,2,3,4,5,6],
+    drawDayNames:'每日开奖',
+    pricePerTicket:2,
+    apiCode:'fc3d',
+    seq:true,
+    red:{count:3,min:0,max:9,unique:false},
+    blue:{count:0,min:0,max:0,unique:false},
+    prizes:[
+      {name:'直选',check:(r,b,wr)=>r.join('')===wr.join(''),amount:1040},
+      {name:'组六',check:(r,b,wr)=>[...r].sort().join('')===[...wr].sort().join(''),amount:173},
+    ]
+  },
+  p5:{
+    name:'排列五',type:'welfare',label:'福彩',
+    desc:'5个位置各选0-9，直选每注2元',
+    drawDays:[0,1,2,3,4,5,6],
+    drawDayNames:'每日开奖',
+    pricePerTicket:2,
+    apiCode:'p5',
+    seq:true,
+    red:{count:5,min:0,max:9,unique:false},
+    blue:{count:0,min:0,max:0,unique:false},
+    prizes:[
+      {name:'一等奖',check:(r,b,wr)=>r.join('')===wr.join(''),amount:100000},
+    ]
+  },
+};
+
+function mc(arr,w){return arr.filter(n=>w.includes(n)).length}
+
+// ─────────────────────────────────────────────
+// Network-driven issue & draw result
+// Calls /api/lottery (Cloudflare Pages Function → Tavily Search API).
+// Sends { type, issue? } — no LLM, no API key in browser.
+// ─────────────────────────────────────────────
+
+const ISSUE_CACHE = {}; // type => { issue, drawDate, nextIssue, status }
+const DRAW_CACHE  = {}; // "type_issue" => { red, blue, date } | null
+
+// ── Call Pages Function ─────────────────────────────────────────
+async function lotteryFetch(type, issue) {
+  const body = issue ? { type, issue } : { type };
+  const resp = await fetch('/api/lottery', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(body),
+  });
+
+  if (resp.status === 500) {
+    const d = await resp.json().catch(() => ({}));
+    if (d.error && d.error.includes('TAVILY_API_KEY')) throw new Error('NOT_CONFIGURED');
+    throw new Error('SERVER_ERROR: ' + (d.error || resp.status));
+  }
+  if (!resp.ok) throw new Error('HTTP_' + resp.status);
+
+  const data = await resp.json();
+  if (data.error === 'parse_failed') {
+    console.warn('Tavily parse_failed. Answer:', data.answer);
+    throw new Error('PARSE_FAILED');
+  }
+  if (data.error) throw new Error(data.error);
+  return data; // { issue, date, red, blue }
+}
+
+// ── "Not configured" notice ──────────────────────────────────────
+function showConfigNotice() {
+  let notice = document.getElementById('configNotice');
+  if (notice) { notice.style.display = 'flex'; return; }
+  notice = document.createElement('div');
+  notice.id = 'configNotice';
+  notice.style.cssText =
+    'position:fixed;inset:0;z-index:2000;background:rgba(40,80,50,.4);' +
+    'backdrop-filter:blur(8px);display:flex;align-items:center;justify-content:center;padding:20px';
+  notice.innerHTML = `
+    <div style="background:rgba(255,255,255,.97);border-radius:20px;padding:28px 24px;
+                max-width:440px;width:100%;box-shadow:0 16px 60px rgba(40,100,60,.2);
+                border:1px solid rgba(200,237,217,.8)">
+      <div style="text-align:center;font-size:2rem;margin-bottom:10px">⚙️</div>
+      <div style="font-family:'Noto Serif SC',serif;font-size:1.05rem;font-weight:700;
+                  text-align:center;color:#2d4a3e;margin-bottom:12px">需要配置 Tavily API Key</div>
+      <div style="font-size:.78rem;color:#5a7a6a;line-height:1.9;margin-bottom:18px">
+        请在 Cloudflare Pages 控制台添加环境变量，然后重新部署：<br>
+        <div style="margin:10px 0;padding:10px 14px;background:rgba(100,190,140,.08);
+                    border-radius:8px;border:1px solid rgba(100,190,140,.25);
+                    font-family:'Space Mono',monospace;font-size:.72rem;line-height:2.2">
+          <b>TAVILY_API_KEY</b> = tvly-xxxxxxxx
+        </div>
+        路径：Pages 项目 → Settings → Environment variables<br>
+        Key 获取：<a href="https://app.tavily.com/" target="_blank"
+          style="color:#2e7d32">app.tavily.com</a>（每月 1000 次免费）
+      </div>
+      <div style="display:flex;gap:8px">
+        <a href="https://dash.cloudflare.com/" target="_blank"
+           style="flex:1;padding:10px;border-radius:100px;text-align:center;
+                  background:linear-gradient(135deg,#6dbf8e,#43a047);color:#fff;
+                  font-family:'Noto Sans SC',sans-serif;font-size:.85rem;font-weight:500;
+                  text-decoration:none;display:block">
+          前往 Cloudflare 控制台
+        </a>
+        <button onclick="document.getElementById('configNotice').style.display='none'"
+                style="padding:10px 18px;border-radius:100px;
+                       border:1.5px solid rgba(100,180,130,.25);background:transparent;
+                       color:#9dbdac;font-family:'Noto Sans SC',sans-serif;
+                       font-size:.85rem;cursor:pointer">关闭</button>
+      </div>
+    </div>`;
+  document.body.appendChild(notice);
+}
+
+// ── Fetch latest issue ────────────────────────────────────────────
+async function fetchLatestIssue(type) {
+  if (ISSUE_CACHE[type]) return ISSUE_CACHE[type];
+
+  let result = null;
+  try {
+    const data = await lotteryFetch(type, null);
+    if (data.issue) {
+      result = {
+        issue:     String(data.issue),
+        drawDate:  String(data.date || '').slice(0, 10),
+        red:       Array.isArray(data.red)  ? data.red.map(Number)  : [],
+        blue:      Array.isArray(data.blue) ? data.blue.map(Number) : [],
+        nextIssue: String(parseInt(data.issue) + 1),
+        status: 'ok',
+      };
+      // Cache this draw result
+      DRAW_CACHE[type + '_' + result.issue] = {
+        red: result.red, blue: result.blue, date: result.drawDate,
+      };
+    }
+  } catch(e) {
+    console.warn('fetchLatestIssue:', e.message);
+    if (e.message === 'NOT_CONFIGURED') {
+      showConfigNotice();
+      result = { issue:'未配置', drawDate:'', nextIssue:'', status:'not_configured' };
+    } else {
+      result = { issue:'获取失败', drawDate:'', nextIssue:'', status:'error', errMsg: e.message };
+    }
+  }
+
+  if (!result) result = { issue:'获取失败', drawDate:'', nextIssue:'', status:'error' };
+  ISSUE_CACHE[type] = result;
+  return result;
+}
+
+// ── Fetch draw result for a specific issue ───────────────────────
+async function fetchDrawResult(type, issue) {
+  const cacheKey = type + '_' + issue;
+  if (DRAW_CACHE[cacheKey] !== undefined) return DRAW_CACHE[cacheKey];
+
+  let result = null;
+  try {
+    const data = await lotteryFetch(type, issue);
+    if (data.red && Array.isArray(data.red) && data.red.length > 0) {
+      result = {
+        red:  data.red.map(Number),
+        blue: Array.isArray(data.blue) ? data.blue.map(Number) : [],
+        date: String(data.date || '').slice(0, 10),
+      };
+    }
+  } catch(e) {
+    console.warn('fetchDrawResult:', e.message);
+    if (e.message === 'NOT_CONFIGURED') showConfigNotice();
+  }
+
+  DRAW_CACHE[cacheKey] = result;
+  return result;
+}
+
+// ── Update issue display UI (async) ──────────────────────────────
+async function updateIssueDisplay() {
+  const el  = document.getElementById('issueDisplay');
+  const lbl = document.getElementById('issueLabel');
+  const cfg = LOTTERIES[currentType];
+
+  el.textContent = '查询中…';
+  el.style.color = 'var(--text-muted)';
+  if (lbl) lbl.textContent = '正在获取最新期次…';
+  document.getElementById('lotteryInfoText').textContent =
+    cfg.desc + '  ·  ' + cfg.drawDayNames;
+
+  const info = await fetchLatestIssue(currentType);
+
+  if (info.status === 'not_configured') {
+    el.textContent = '未配置';
+    el.style.color = '#b8860b';
+    if (lbl) lbl.textContent = '请配置 TAVILY_API_KEY 环境变量';
+    return null;
+  }
+  if (info.status === 'error') {
+    el.textContent = '获取失败';
+    el.style.color = 'rgba(200,80,80,.8)';
+    if (lbl) lbl.textContent = info.errMsg || '搜索失败，请刷新重试';
+    return null;
+  }
+
+  const buyIssue = info.nextIssue || String(parseInt(info.issue) + 1);
+  el.textContent = '第 ' + buyIssue + ' 期';
+  el.style.color = '';
+  if (lbl) {
+    lbl.textContent = '最新已开：第' + info.issue + '期' +
+      (info.drawDate ? '（' + info.drawDate + '）' : '');
+  }
+  document.getElementById('lotteryInfoText').textContent =
+    cfg.desc + '  ·  ' + cfg.drawDayNames;
+
+  return buyIssue;
+}
+// ─────────────────────────────────────────────
+// Random generation
+// ─────────────────────────────────────────────
+function randUniq(count, min, max) {
+  const pool = [];
+  for (let i = min; i <= max; i++) pool.push(i);
+  for (let i = 0; i < count; i++) {
+    const j = i + Math.floor(Math.random() * (pool.length - i));
+    [pool[i], pool[j]] = [pool[j], pool[i]];
+  }
+  return pool.slice(0, count).sort((a,b)=>a-b);
+}
+function randRepeat(count, min, max) {
+  const range = max - min + 1;
+  const buf = new Uint32Array(count);
+  crypto.getRandomValues(buf);
+  return Array.from(buf, v => min + (v % range));
+}
+function fmt(n, cfg) {
+  return (cfg.min===0 && cfg.max<=9) ? String(n) : String(n).padStart(2,'0');
+}
+function genNums(cfg) {
+  const red = cfg.red.unique ? randUniq(cfg.red.count,cfg.red.min,cfg.red.max)
+                             : randRepeat(cfg.red.count,cfg.red.min,cfg.red.max);
+  const blue = cfg.blue.count > 0
+    ? (cfg.blue.unique ? randUniq(cfg.blue.count,cfg.blue.min,cfg.blue.max)
+                       : randRepeat(cfg.blue.count,cfg.blue.min,cfg.blue.max))
+    : [];
+  return {red, blue};
+}
+
+// ─────────────────────────────────────────────
+// State
+// ─────────────────────────────────────────────
+let currentType = 'ssq';
+let historyRecords = [];
+let activeCheckId = null;
+
+const STORAGE_KEY = 'lottery_history_v2';
+
+function saveHistory() {
+  try {
+    localStorage.setItem(STORAGE_KEY, JSON.stringify(historyRecords.map(r => ({
+      id:r.id, type:r.type, time:r.time, issue:r.issue,
+      drawDate:r.drawDate||'',
+      tickets:r.tickets, checkDone:r.checkDone,
+      winRed:r.winRed, winBlue:r.winBlue,
+      drawResult:r.drawResult || null,
+      hasWon:r.hasWon || false,
+    }))));
+  } catch(e) {}
+}
+
+function loadHistory() {
+  try {
+    const raw = localStorage.getItem(STORAGE_KEY);
+    if (!raw) return;
+    const data = JSON.parse(raw);
+    if (!Array.isArray(data)) return;
+    historyRecords = data.map(r => ({
+      id:r.id, type:r.type, time:r.time, issue:r.issue||'',
+      drawDate:r.drawDate||'',
+      tickets:r.tickets||[], checkDone:r.checkDone||false,
+      winRed:r.winRed||[], winBlue:r.winBlue||[],
+      drawResult:r.drawResult||null,
+      hasWon:r.hasWon||false,
+    }));
+  } catch(e) { historyRecords = []; }
+}
+
+function nowStr() {
+  const d = new Date(), pad = n => String(n).padStart(2,'0');
+  return `${d.getMonth()+1}/${pad(d.getDate())} ${pad(d.getHours())}:${pad(d.getMinutes())}`;
+}
+
+// ─────────────────────────────────────────────
+// Nav
+// ─────────────────────────────────────────────
+function initNav() {
+  document.querySelectorAll('.nav-btn').forEach(btn => {
+    btn.addEventListener('click', () => {
+      document.querySelectorAll('.nav-btn').forEach(b => b.classList.remove('active'));
+      document.querySelectorAll('.page').forEach(p => p.classList.remove('active'));
+      btn.classList.add('active');
+      document.getElementById('page-' + btn.dataset.page).classList.add('active');
+    });
+  });
+}
+
+// ─────────────────────────────────────────────
+// Type tabs
+// ─────────────────────────────────────────────
+function initTabs() {
+  const c = document.getElementById('typeTabs');
+  Object.entries(LOTTERIES).forEach(([key,cfg]) => {
+    const btn = document.createElement('button');
+    btn.className='type-tab'; btn.dataset.key=key;
+    btn.innerHTML=`${cfg.name}<span class="type-badge badge-${cfg.type}">${cfg.label}</span>`;
+    btn.onclick=()=>selectType(key);
+    c.appendChild(btn);
+  });
+  selectType('ssq');
+  fillHelpTypes();
+}
+
+function selectType(key) {
+  currentType = key;
+  const cfg = LOTTERIES[key];
+  document.querySelectorAll('.type-tab').forEach(b => {
+    b.className='type-tab'+(b.dataset.key===key?` active-${cfg.type}`:'');
+  });
+  document.getElementById('lotteryInfoText').textContent = cfg.desc;
+  document.getElementById('btnGenerate').className = `btn-generate ${cfg.type}`;
+  updateIssueDisplay(); // async, non-blocking
+  updatePriceHint();
+}
+
+function fillHelpTypes() {
+  const grid = document.getElementById('helpLotteryTypes');
+  Object.entries(LOTTERIES).forEach(([key,cfg]) => {
+    const card = document.createElement('div');
+    card.className='lottery-type-card';
+    const drawStr = ['日','一','二','三','四','五','六'];
+    const days = cfg.drawDays.length===7?'每天开奖':cfg.drawDays.map(d=>'周'+drawStr[d]).join('、');
+    card.innerHTML=`
+      <div class="ltc-name">
+        ${cfg.name}
+        <span class="ltc-badge badge-${cfg.type}">${cfg.label}</span>
+      </div>
+      <div class="ltc-desc">${cfg.desc}<br><span style="color:var(--text-muted);font-size:.65rem">开奖：${days}</span></div>`;
+    grid.appendChild(card);
+  });
+}
+
+// ─────────────────────────────────────────────
+// Generate
+// ─────────────────────────────────────────────
+function updatePriceHint() {
+  const count = Math.min(20,Math.max(1,parseInt(document.getElementById('countInput').value)||5));
+  const cfg = LOTTERIES[currentType];
+  const total = count * cfg.pricePerTicket;
+  const hintEl = document.getElementById('priceHint');
+  const rowEl  = document.getElementById('priceHintRow');
+  if (hintEl && rowEl) {
+    hintEl.textContent = '💰 ' + count + ' 注 × ¥' + cfg.pricePerTicket + ' = ¥' + total + ' 元';
+    rowEl.style.display = '';
+  }
+}
+
+async function generate() {
+  const count = Math.min(20, Math.max(1, parseInt(document.getElementById('countInput').value)||5));
+  document.getElementById('countInput').value = count;
+  const cfg = LOTTERIES[currentType];
+  const btn = document.getElementById('btnGenerate');
+  btn.disabled = true;
+  btn.textContent = '获取期次…';
+
+  // Fetch latest issue from network; fall back to display value
+  let buyIssue = null;
+  let drawDate = '';
+  try {
+    const info = await fetchLatestIssue(currentType);
+    if (info.status === 'ok') {
+      buyIssue  = info.nextIssue || String(parseInt(info.issue) + 1);
+      drawDate  = ''; // next draw date not directly available; leave blank
+    }
+  } catch(e) { /* ignore */ }
+
+  // If API failed, read whatever is currently shown in the display
+  if (!buyIssue || ['获取失败','未配置','未知'].includes(buyIssue)) {
+    const shown = document.getElementById('issueDisplay').textContent.replace(/[^0-9]/g, '');
+    buyIssue = shown || '未知';
+  }
+
+  btn.disabled = false;
+  btn.className = `btn-generate ${cfg.type}`;
+  btn.textContent = '🎲 随机生成';
+
+  const record = {
+    id: Date.now() + Math.floor(Math.random()*1e6),
+    type: currentType,
+    time: nowStr(),
+    issue: buyIssue,
+    drawDate: drawDate,
+    tickets: Array.from({length:count}, () => genNums(cfg)),
+    checkDone: false,
+    winRed: [], winBlue: [],
+    drawResult: null,
+    hasWon: false,
+  };
+  historyRecords.unshift(record);
+  prependHistoryCard(record);
+  saveHistory();
+  updatePriceHint();
+  if (activeCheckId !== null && activeCheckId !== record.id) closeChecker();
+}
+
+// ─────────────────────────────────────────────
+// History rendering
+// ─────────────────────────────────────────────
+function prependHistoryCard(rec) {
+  const list = document.getElementById('historyList');
+  document.getElementById('historyEmpty').style.display = 'none';
+  list.insertBefore(buildHistoryCard(rec), list.firstChild);
+  updateHistoryCount();
+}
+
+function updateHistoryCount() {
+  document.getElementById('historyCount').textContent =
+    historyRecords.length ? `· ${historyRecords.length} 期` : '';
+}
+
+function buildHistoryCard(rec) {
+  const cfg = LOTTERIES[rec.type];
+  const card = document.createElement('div');
+  card.className = `history-card ${cfg.type}`;
+  card.id = `hcard-${rec.id}`;
+
+  // Header
+  const hdr = document.createElement('div');
+  hdr.className = 'hcard-header';
+
+  const meta = document.createElement('div');
+  meta.className = 'hcard-meta';
+  const price = rec.tickets.length * cfg.pricePerTicket;
+  const drawDateStr = rec.drawDate ? rec.drawDate : '';
+  meta.innerHTML = `
+    <span class="hcard-badge ${cfg.type}">${cfg.label}</span>
+    <span class="hcard-name">${cfg.name}</span>
+    <span class="hcard-issue">第${rec.issue}期</span>
+    ${drawDateStr ? `<span class="hcard-drawdate">🗓 ${drawDateStr}开奖</span>` : ''}
+    <span class="hcard-time">${rec.time} · ${rec.tickets.length}注 · ¥${price}</span>`;
+
+  const actions = document.createElement('div');
+  actions.className = 'hcard-actions';
+
+  // Draw status badge
+  const statusBadge = document.createElement('span');
+  statusBadge.id = `status-${rec.id}`;
+  statusBadge.className = 'draw-status';
+  updateStatusBadge(statusBadge, rec);
+  statusBadge.onclick = () => queryDrawForRecord(rec, statusBadge, card);
+  actions.appendChild(statusBadge);
+
+  const qBtn = document.createElement('button');
+  qBtn.className = 'btn-query'; qBtn.id = `qbtn-${rec.id}`;
+  qBtn.textContent = '🔍 中奖查询';
+  qBtn.onclick = () => toggleChecker(rec.id);
+  actions.appendChild(qBtn);
+
+  const delBtn = document.createElement('button');
+  delBtn.className = 'btn-delete'; delBtn.title = '删除';
+  delBtn.textContent = '✕';
+  delBtn.onclick = () => deleteRecord(rec.id);
+  actions.appendChild(delBtn);
+
+  hdr.appendChild(meta);
+  hdr.appendChild(actions);
+  card.appendChild(hdr);
+
+  // Draw result row (if already fetched)
+  const drawRow = document.createElement('div');
+  drawRow.id = `drawrow-${rec.id}`;
+  if (rec.drawResult) {
+    renderDrawRow(drawRow, rec);
+  }
+  card.appendChild(drawRow);
+
+  // Tickets
+  const ticketDiv = document.createElement('div');
+  ticketDiv.className = 'hcard-tickets';
+  ticketDiv.id = `tickets-${rec.id}`;
+  rec.tickets.forEach((t, ti) => ticketDiv.appendChild(buildTicketRow(rec, ti, cfg)));
+  card.appendChild(ticketDiv);
+
+  // Footer
+  const footer = document.createElement('div');
+  footer.className = 'card-footer';
+  const fsBtn = document.createElement('button');
+  fsBtn.className = 'btn-small'; fsBtn.textContent = '📋 全屏查看';
+  fsBtn.onclick = () => openFullscreen(rec);
+  footer.appendChild(fsBtn);
+  card.appendChild(footer);
+
+  return card;
+}
+
+function updateStatusBadge(badge, rec) {
+  if (rec.drawResult) {
+    if (rec.hasWon) {
+      badge.className = 'draw-status won';
+      badge.textContent = '🏆 已中奖';
+    } else {
+      badge.className = 'draw-status drawn';
+      badge.textContent = '✓ 已开奖';
+    }
+  } else {
+    badge.className = 'draw-status pending';
+    badge.textContent = '⏳ 查询开奖';
+  }
+}
+
+function renderDrawRow(container, rec) {
+  const cfg = LOTTERIES[rec.type];
+  const dr = rec.drawResult;
+  container.innerHTML = '';
+  const row = document.createElement('div');
+  row.className = 'draw-result-row';
+
+  const lbl = document.createElement('span');
+  lbl.className = 'draw-result-label'; lbl.textContent = '开奖号';
+  row.appendChild(lbl);
+
+  const redsWrap = document.createElement('div');
+  redsWrap.className = 'balls-inline';
+  dr.red.forEach(n => {
+    const b = document.createElement('div');
+    b.className = 'ball red';
+    b.style.cssText = 'width:28px;height:28px;font-size:.68rem;cursor:default';
+    b.innerHTML = `<span>${fmt(n, cfg.red)}</span>`;
+    redsWrap.appendChild(b);
+  });
+  row.appendChild(redsWrap);
+
+  if (dr.blue && dr.blue.length > 0) {
+    const sep = document.createElement('div'); sep.className = 'row-sep'; row.appendChild(sep);
+    const bluesWrap = document.createElement('div');
+    bluesWrap.className = 'balls-inline';
+    dr.blue.forEach(n => {
+      const b = document.createElement('div');
+      b.className = 'ball blue';
+      b.style.cssText = 'width:28px;height:28px;font-size:.68rem;cursor:default';
+      b.innerHTML = `<span>${fmt(n, cfg.blue)}</span>`;
+      bluesWrap.appendChild(b);
+    });
+    row.appendChild(bluesWrap);
+  }
+
+  if (dr.date) {
+    const dateSpan = document.createElement('span');
+    dateSpan.className = 'draw-result-date';
+    dateSpan.textContent = '开奖日期：' + dr.date.slice(0,10);
+    row.appendChild(dateSpan);
+  }
+
+  container.appendChild(row);
+}
+
+// ─────────────────────────────────────────────
+// Query draw result for a record
+// ─────────────────────────────────────────────
+async function queryDrawForRecord(rec, badge, card) {
+  if (rec.drawResult) {
+    // Already fetched - open checker with auto-filled numbers
+    autoFillAndCheck(rec);
+    return;
+  }
+  badge.className = 'draw-status loading';
+  badge.textContent = '⏳ 查询中…';
+
+  const result = await fetchDrawResult(rec.type, rec.issue);
+
+  if (!result) {
+    badge.className = 'draw-status pending';
+    badge.textContent = '⏳ 未开奖';
+    // Show small toast
+    showToast('该期尚未开奖或查询失败，请稍后重试');
+    return;
+  }
+
+  rec.drawResult = result;
+
+  // Auto-run check
+  const cfg = LOTTERIES[rec.type];
+  const isSeq = !!cfg.seq;
+  const wr = result.red; const wb = result.blue;
+  let anyWon = false;
+  rec.tickets.forEach(t => {
+    for (const p of cfg.prizes) {
+      if (p.check(t.red, t.blue, wr, wb)) { anyWon = true; break; }
+    }
+  });
+  rec.hasWon = anyWon;
+
+  // Save draw result and win numbers into record for checker
+  rec.checkDone = true;
+  rec.winRed = wr.map(v=>v);
+  rec.winBlue = wb.map(v=>v);
+
+  updateStatusBadge(badge, rec);
+
+  // Render draw row
+  const drawRow = document.getElementById(`drawrow-${rec.id}`);
+  if (drawRow) renderDrawRow(drawRow, rec);
+
+  saveHistory();
+
+  // If active checker is this record, refresh
+  if (activeCheckId === rec.id) runCheck(rec.id);
+
+  // Auto fill and check
+  autoFillAndCheck(rec);
+}
+
+function autoFillAndCheck(rec) {
+  if (!rec.drawResult) return;
+  // Open checker for this record
+  if (activeCheckId !== rec.id) toggleChecker(rec.id);
+}
+
+function showToast(msg) {
+  let t = document.getElementById('toast');
+  if (!t) {
+    t = document.createElement('div');
+    t.id = 'toast';
+    t.style.cssText = 'position:fixed;bottom:30px;left:50%;transform:translateX(-50%);background:rgba(40,80,50,.88);color:#fff;padding:9px 20px;border-radius:100px;font-size:.78rem;z-index:2000;pointer-events:none;transition:opacity .3s;white-space:nowrap;letter-spacing:.04em';
+    document.body.appendChild(t);
+  }
+  t.textContent = msg; t.style.opacity = '1';
+  clearTimeout(t._timer);
+  t._timer = setTimeout(() => { t.style.opacity='0'; }, 2500);
+}
+
+// ─────────────────────────────────────────────
+// Ticket row builder
+// ─────────────────────────────────────────────
+function buildTicketRow(rec, ti, cfg) {
+  const t = rec.tickets[ti];
+  const wrap = document.createElement('div');
+  wrap.className = 'ticket-row-wrap';
+  wrap.id = `trow-${rec.id}-${ti}`;
+  const row = document.createElement('div');
+  row.className = 'ticket-row';
+
+  const numLbl = document.createElement('span');
+  numLbl.className = 'ticket-row-num';
+  numLbl.textContent = String(ti+1).padStart(2,'0') + '.';
+  row.appendChild(numLbl);
+
+  const redG = document.createElement('div'); redG.className = 'balls-inline';
+  t.red.forEach((n,bi) => redG.appendChild(makeBall(n,'red',rec,ti,bi,'red',cfg.red)));
+  row.appendChild(redG);
+
+  if (t.blue.length > 0) {
+    const sep = document.createElement('div'); sep.className = 'row-sep'; row.appendChild(sep);
+    const blueG = document.createElement('div'); blueG.className = 'balls-inline';
+    t.blue.forEach((n,bi) => blueG.appendChild(makeBall(n,'blue',rec,ti,bi,'blue',cfg.blue)));
+    row.appendChild(blueG);
+  }
+
+  const pb = document.createElement('span');
+  pb.className = 'row-prize'; pb.id = `rowprize-${rec.id}-${ti}`;
+  row.appendChild(pb);
+  wrap.appendChild(row);
+  return wrap;
+}
+
+function makeBall(num, color, rec, ti, bi, group, ballCfg) {
+  const ball = document.createElement('div');
+  ball.className = `ball ${color} ball-anim`;
+  ball.style.animationDelay = `${(ti*ballCfg.count+bi)*0.03}s`;
+  ball.id = `ball-${rec.id}-${ti}-${group}-${bi}`;
+  ball.innerHTML = `<span>${fmt(num, ballCfg)}</span>`;
+  ball.addEventListener('click', () => editBall(ball, rec, ti, bi, group, ballCfg));
+  return ball;
+}
+
+function editBall(ball, rec, ti, bi, group, ballCfg) {
+  if (ball.classList.contains('editing')) return;
+  const cfg = LOTTERIES[rec.type];
+  const old = ball.querySelector('span').textContent;
+  ball.classList.add('editing');
+  ball.innerHTML = '';
+  const inp = document.createElement('input');
+  inp.type='number'; inp.min=ballCfg.min; inp.max=ballCfg.max; inp.value=old;
+  inp.style.cssText='width:100%;height:100%;background:transparent;border:none;outline:none;text-align:center;font-family:Space Mono,monospace;font-size:.76rem;font-weight:700;color:inherit;padding:0';
+  ball.appendChild(inp); inp.focus(); inp.select();
+  function commit() {
+    let v = parseInt(inp.value);
+    if (isNaN(v)||v<ballCfg.min) v=ballCfg.min;
+    if (v>ballCfg.max) v=ballCfg.max;
+    if (ballCfg.unique) {
+      const arr = rec.tickets[ti][group];
+      if (arr.some((n,i)=>i!==bi&&n===v)) {
+        const used=new Set(arr);
+        for (let i=ballCfg.min;i<=ballCfg.max;i++){if(!used.has(i)){v=i;break}}
+      }
+    }
+    rec.tickets[ti][group][bi]=v;
+
+    // Auto-sort unique groups ascending after edit
+    if (ballCfg.unique) {
+      rec.tickets[ti][group].sort((a,b)=>a-b);
+    }
+
+    // Re-render the entire ticket row so ball indices stay in sync after sort
+    const cfg2 = LOTTERIES[rec.type];
+    const rowWrap = document.getElementById('trow-'+rec.id+'-'+ti);
+    if (rowWrap) {
+      const newWrap = buildTicketRow(rec, ti, cfg2);
+      rowWrap.parentNode.replaceChild(newWrap, rowWrap);
+      // Re-apply match highlights if check was already done
+      if (rec.checkDone && rec.winRed.length) {
+        const wr=rec.winRed.filter(v=>v!==null), wb=rec.winBlue.filter(v=>v!==null);
+        const isSeq=!!cfg2.seq;
+        rec.tickets[ti].red.forEach((val,b2)=>{
+          const bl=document.getElementById('ball-'+rec.id+'-'+ti+'-red-'+b2);
+          if(bl){bl.classList.remove('matched','not-matched');bl.classList.add((isSeq?(wr[b2]===val):wr.includes(val))?'matched':'not-matched')}
+        });
+        rec.tickets[ti].blue.forEach((val,b2)=>{
+          const bl=document.getElementById('ball-'+rec.id+'-'+ti+'-blue-'+b2);
+          if(bl){bl.classList.remove('matched','not-matched');bl.classList.add(wb.includes(val)?'matched':'not-matched')}
+        });
+      }
+    } else {
+      // fallback: just update the single ball
+      ball.classList.remove('editing');
+      ball.innerHTML=`<span>${fmt(v,ballCfg)}</span>`;
+      ball.addEventListener('click',()=>editBall(ball,rec,ti,bi,group,ballCfg));
+    }
+
+    saveHistory();
+    if (activeCheckId===rec.id&&rec.checkDone) runCheck(rec.id);
+  }
+  inp.addEventListener('blur', commit);
+  inp.addEventListener('keydown', e=>{if(e.key==='Enter')inp.blur();if(e.key==='Escape'){inp.value=old;inp.blur()}});
+}
+
+// ─────────────────────────────────────────────
+// Delete
+// ─────────────────────────────────────────────
+function deleteRecord(id) {
+  historyRecords = historyRecords.filter(r=>r.id!==id);
+  if (activeCheckId===id) closeChecker();
+  const card = document.getElementById('hcard-'+id);
+  if (card) card.remove();
+  updateHistoryCount();
+  saveHistory();
+  if (!historyRecords.length) {
+    const list = document.getElementById('historyList');
+    const empty = document.getElementById('historyEmpty');
+    list.appendChild(empty);
+    empty.style.display='';
+  }
+}
+
+// ─────────────────────────────────────────────
+// Checker
+// ─────────────────────────────────────────────
+function setQueryDim(activeId) {
+  document.querySelectorAll('.history-card').forEach(card => {
+    if (activeId!==null && card.id!=='hcard-'+activeId) card.classList.add('query-dimmed');
+    else card.classList.remove('query-dimmed');
+  });
+}
+
+function toggleChecker(id) {
+  if (activeCheckId===id) { closeChecker(); return; }
+  activeCheckId = id;
+  const rec = historyRecords.find(r=>r.id===id);
+  if (!rec) return;
+  setQueryDim(id);
+  document.querySelectorAll('.btn-query').forEach(b=>b.classList.remove('active'));
+  const qbtn = document.getElementById('qbtn-'+id);
+  if (qbtn) qbtn.classList.add('active');
+  const cfg = LOTTERIES[rec.type];
+  document.getElementById('checkerTitle').textContent = `· ${cfg.label} ${cfg.name} · 第${rec.issue}期`;
+  buildWinInputs(rec);
+  const panel = document.getElementById('checkerPanel');
+  panel.style.display='';
+  setTimeout(()=>panel.scrollIntoView({behavior:'smooth',block:'nearest'}),80);
+  restoreWinInputs(rec);
+  if (rec.checkDone && rec.winRed.length) runCheck(id);
+  else { document.getElementById('prizeResult').className='prize-result'; clearHighlightForRecord(rec); }
+}
+
+function closeChecker() {
+  activeCheckId=null;
+  setQueryDim(null);
+  document.getElementById('checkerPanel').style.display='none';
+  document.querySelectorAll('.btn-query').forEach(b=>b.classList.remove('active'));
+}
+
+function buildWinInputs(rec) {
+  const cfg = LOTTERIES[rec.type];
+  const isSeq = !!cfg.seq;
+  const c = document.getElementById('winBallsRow');
+  c.innerHTML='';
+  const lbl = document.createElement('span');
+  lbl.className=`win-ball-label ${isSeq?'lbl-seq':'lbl-red'}`;
+  lbl.textContent=isSeq?'号码':'红球';
+  c.appendChild(lbl);
+  for (let i=0;i<cfg.red.count;i++) {
+    const inp=document.createElement('input');
+    inp.type='number'; inp.className=`win-ball-input ${isSeq?'lbl-seq':'lbl-red'}`;
+    inp.id=`winr-${i}`; inp.min=cfg.red.min; inp.max=cfg.red.max; inp.placeholder='--';
+    inp.addEventListener('input',()=>inp.classList.toggle('filled',inp.value.trim()!==''));
+    c.appendChild(inp);
+  }
+  if (!isSeq && cfg.blue.count>0) {
+    const sep=document.createElement('div'); sep.className='row-sep-check'; c.appendChild(sep);
+    const lbl2=document.createElement('span'); lbl2.className='win-ball-label lbl-blue'; lbl2.textContent='蓝球'; c.appendChild(lbl2);
+    for (let i=0;i<cfg.blue.count;i++) {
+      const inp=document.createElement('input');
+      inp.type='number'; inp.className='win-ball-input lbl-blue';
+      inp.id=`winb-${i}`; inp.min=cfg.blue.min; inp.max=cfg.blue.max; inp.placeholder='--';
+      inp.addEventListener('input',()=>inp.classList.toggle('filled',inp.value.trim()!==''));
+      c.appendChild(inp);
+    }
+  }
+}
+
+function restoreWinInputs(rec) {
+  const cfg = LOTTERIES[rec.type];
+  rec.winRed.forEach((v,i)=>{ const el=document.getElementById(`winr-${i}`); if(el&&v!==null){el.value=v;el.classList.add('filled')} });
+  rec.winBlue.forEach((v,i)=>{ const el=document.getElementById(`winb-${i}`); if(el&&v!==null){el.value=v;el.classList.add('filled')} });
+  document.getElementById('prizeResult').className='prize-result';
+}
+
+function getWinNums(rec) {
+  const cfg = LOTTERIES[rec.type];
+  const isSeq = !!cfg.seq;
+  const wr = Array.from({length:cfg.red.count},(_,i)=>{const el=document.getElementById(`winr-${i}`);if(!el)return null;const v=parseInt(el.value);return isNaN(v)?null:v});
+  const wb = (!isSeq&&cfg.blue.count>0) ? Array.from({length:cfg.blue.count},(_,i)=>{const el=document.getElementById(`winb-${i}`);if(!el)return null;const v=parseInt(el.value);return isNaN(v)?null:v}) : [];
+  return {wr,wb};
+}
+
+function runCheck(id) {
+  const rec = historyRecords.find(r=>r.id===id);
+  if (!rec) return;
+  const cfg = LOTTERIES[rec.type];
+  const isSeq = !!cfg.seq;
+  const {wr,wb} = getWinNums(rec);
+  const wrFull=wr.filter(v=>v!==null), wbFull=wb.filter(v=>v!==null);
+  if (wrFull.length<cfg.red.count||(!isSeq&&wbFull.length<cfg.blue.count)) { alert('请填写完整的开奖号码'); return; }
+  rec.checkDone=true; rec.winRed=wr; rec.winBlue=wb;
+  let anyWon=false;
+  let total=0; const lines=[];
+  rec.tickets.forEach((t,ti)=>{
+    let hit=null;
+    for (const p of cfg.prizes) { if(p.check(t.red,t.blue,wrFull,wbFull)){hit=p;break} }
+    t.red.forEach((v,bi)=>{ const b=document.getElementById(`ball-${rec.id}-${ti}-red-${bi}`); if(!b)return; b.classList.remove('matched','not-matched'); b.classList.add((isSeq?(wrFull[bi]===v):wrFull.includes(v))?'matched':'not-matched'); });
+    t.blue.forEach((v,bi)=>{ const b=document.getElementById(`ball-${rec.id}-${ti}-blue-${bi}`); if(!b)return; b.classList.remove('matched','not-matched'); b.classList.add(wbFull.includes(v)?'matched':'not-matched'); });
+    const pb=document.getElementById(`rowprize-${rec.id}-${ti}`);
+    if (pb){ if(hit){pb.style.display='inline-block';pb.textContent=`🎉 ${hit.name}`}else{pb.style.display='none'} }
+    if (hit) { lines.push({ti,prize:hit}); total+=hit.amount; anyWon=true; }
+  });
+  rec.hasWon=anyWon;
+  const badge=document.getElementById(`status-${rec.id}`);
+  if (badge) updateStatusBadge(badge,rec);
+  saveHistory();
+  const panel=document.getElementById('prizeResult');
+  panel.className='prize-result visible';
+  panel.innerHTML=lines.length===0
+    ? `<div class="no-win">本次未中奖，再接再厉 🍀</div>`
+    : lines.map(r=>`<div class="prize-line"><span>第 ${String(r.ti+1).padStart(2,'0')} 注 · ${r.prize.name}</span><span class="prize-amount">¥${r.prize.amount.toLocaleString()}</span></div>`).join('')
+      + `<div class="total-line"><span>合计中奖</span><span class="prize-amount">¥${total.toLocaleString()}</span></div>`;
+}
+
+function clearHighlightForRecord(rec) {
+  rec.tickets.forEach((t,ti)=>{
+    t.red.forEach((_,bi)=>{ const b=document.getElementById(`ball-${rec.id}-${ti}-red-${bi}`); if(b)b.classList.remove('matched','not-matched'); });
+    t.blue.forEach((_,bi)=>{ const b=document.getElementById(`ball-${rec.id}-${ti}-blue-${bi}`); if(b)b.classList.remove('matched','not-matched'); });
+    const pb=document.getElementById(`rowprize-${rec.id}-${ti}`); if(pb)pb.style.display='none';
+  });
+}
+
+// ─────────────────────────────────────────────
+// Fullscreen
+// ─────────────────────────────────────────────
+function openFullscreen(rec) {
+  const cfg = LOTTERIES[rec.type];
+  const cls = cfg.type==='sports' ? 'fs-type-s' : 'fs-type-w';
+
+  // Header: type info shown once at top
+  const header = `<span style="display:block;margin-bottom:10px;padding-bottom:8px;border-bottom:1px solid rgba(100,180,130,.2)"><span class="${cls}">${cfg.label} · ${cfg.name}</span>  <span style="color:var(--text-muted)">第 ${rec.issue} 期 · ${rec.tickets.length} 注</span></span>`;
+
+  // One line per ticket: "01.  06  12  18  23  27  30  |  05"
+  const lines = rec.tickets.map((t,i)=>{
+    const r = t.red.map(n=>fmt(n,cfg.red)).join('  ');
+    const bPart = t.blue.length
+      ? `  <span class="fs-sep">·</span>  <span class="fs-blue">${t.blue.map(n=>fmt(n,cfg.blue)).join('  ')}</span>`
+      : '';
+    return `<span style="display:block;line-height:2.2"><span style="color:var(--text-muted);margin-right:10px">第${String(i+1).padStart(2,'0')}注</span><span class="fs-nums">${r}</span>${bPart}</span>`;
+  }).join('');
+
+  document.getElementById('fullscreenText').innerHTML = header + lines;
+  document.getElementById('fullscreenOverlay').classList.add('open');
+}
+
+// ─────────────────────────────────────────────
+// Prize notification modal
+// ─────────────────────────────────────────────
+function checkForWinNotification() {
+  const wonRecords = historyRecords.filter(r => r.hasWon && r.drawResult);
+  if (!wonRecords.length) return;
+  const container = document.getElementById('modalRecords');
+  container.innerHTML = '';
+  wonRecords.forEach(rec => {
+    const cfg = LOTTERIES[rec.type];
+    const div = document.createElement('div');
+    div.className = 'modal-record';
+    const wr=rec.winRed.filter(v=>v!==null), wb=rec.winBlue.filter(v=>v!==null);
+    let totalPrize=0;
+    rec.tickets.forEach(t=>{
+      for (const p of cfg.prizes){if(p.check(t.red,t.blue,wr,wb)){totalPrize+=p.amount;break}}
+    });
+    div.innerHTML=`<strong>${cfg.label} ${cfg.name} 第${rec.issue}期</strong><br>${rec.time} · ${rec.tickets.length}注 · 预计合计 <strong>¥${totalPrize.toLocaleString()}</strong>`;
+    container.appendChild(div);
+  });
+  document.getElementById('prizeModal').classList.remove('hidden');
+  // On close: scroll to first won record
+  document.getElementById('modalBtn').onclick = () => {
+    document.getElementById('prizeModal').classList.add('hidden');
+    const first = wonRecords[0];
+    const card = document.getElementById('hcard-'+first.id);
+    if (card) { card.scrollIntoView({behavior:'smooth',block:'center'}); }
+  };
+}
+
+// ─────────────────────────────────────────────
+// Re-apply highlights on boot
+// ─────────────────────────────────────────────
+function reapplyHighlights() {
+  historyRecords.forEach(rec => {
+    if (!rec.checkDone || !rec.winRed.length) return;
+    const cfg=LOTTERIES[rec.type]; const isSeq=!!cfg.seq;
+    const wr=rec.winRed.filter(v=>v!==null), wb=rec.winBlue.filter(v=>v!==null);
+    rec.tickets.forEach((t,ti)=>{
+      let hit=null;
+      for(const p of cfg.prizes){if(p.check(t.red,t.blue,wr,wb)){hit=p;break}}
+      t.red.forEach((v,bi)=>{ const b=document.getElementById('ball-'+rec.id+'-'+ti+'-red-'+bi); if(!b)return; b.classList.add((isSeq?(wr[bi]===v):wr.includes(v))?'matched':'not-matched'); });
+      t.blue.forEach((v,bi)=>{ const b=document.getElementById('ball-'+rec.id+'-'+ti+'-blue-'+bi); if(!b)return; b.classList.add(wb.includes(v)?'matched':'not-matched'); });
+      const pb=document.getElementById('rowprize-'+rec.id+'-'+ti);
+      if(pb&&hit){pb.style.display='inline-block';pb.textContent='🎉 '+hit.name}
+    });
+  });
+}
+
+// ─────────────────────────────────────────────
+// Event bindings
+// ─────────────────────────────────────────────
+document.getElementById('btnGenerate').addEventListener('click', () => generate());
+document.getElementById('countMinus').addEventListener('click', ()=>{ const i=document.getElementById('countInput'); i.value=Math.max(1,parseInt(i.value||5)-1); updatePriceHint(); });
+document.getElementById('countPlus').addEventListener('click',  ()=>{ const i=document.getElementById('countInput'); i.value=Math.min(20,parseInt(i.value||5)+1); updatePriceHint(); });
+document.getElementById('countInput').addEventListener('input', ()=>updatePriceHint());
+document.getElementById('btnCheck').addEventListener('click', ()=>{ if(activeCheckId!==null)runCheck(activeCheckId); });
+document.getElementById('btnClearCheck').addEventListener('click', ()=>{
+  if(activeCheckId===null)return;
+  const rec=historyRecords.find(r=>r.id===activeCheckId); if(!rec)return;
+  rec.checkDone=false; rec.winRed=[]; rec.winBlue=[]; rec.hasWon=false;
+  document.querySelectorAll('.win-ball-input').forEach(i=>{i.value='';i.classList.remove('filled')});
+  document.getElementById('prizeResult').className='prize-result';
+  clearHighlightForRecord(rec);
+  const badge=document.getElementById('status-'+rec.id); if(badge)updateStatusBadge(badge,rec);
+  saveHistory();
+});
+document.getElementById('btnCloseChecker').addEventListener('click', closeChecker);
+document.getElementById('btnCloseFs').addEventListener('click', ()=>document.getElementById('fullscreenOverlay').classList.remove('open'));
+document.getElementById('fullscreenOverlay').addEventListener('click', e=>{ if(e.target===document.getElementById('fullscreenOverlay'))document.getElementById('fullscreenOverlay').classList.remove('open'); });
+
+// ─────────────────────────────────────────────
+// Boot
+// ─────────────────────────────────────────────
+loadHistory();
+initNav();
+initTabs();
+
+if (historyRecords.length) {
+  const list = document.getElementById('historyList');
+  document.getElementById('historyEmpty').style.display='none';
+  historyRecords.forEach(rec => list.appendChild(buildHistoryCard(rec)));
+  updateHistoryCount();
+  reapplyHighlights();
+}
+
+// Check for win notifications after a short delay
+setTimeout(checkForWinNotification, 600);
+</script>
+</body>
+</html>
