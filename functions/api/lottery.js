@@ -1,54 +1,82 @@
 /**
  * Cloudflare Pages Function: /api/lottery
  *
- * Uses Tavily Search API to fetch Chinese lottery draw results.
- * Searches Chinese-language sources with site restrictions.
+ * Data source: https://raw.githubusercontent.com/yangxb919/lottery-data/main/data/
+ * - data/latest.json  — latest draw for ssq & dlt (updated daily by GitHub Actions)
+ * - data/ssq.json     — full ssq history, latest first
+ * - data/dlt.json     — full dlt history, latest first
  *
- * Environment variables:
- *   TAVILY_API_KEY  – Tavily API key (tvly-xxxxxxx)
+ * For qxc / fc3d / p5: falls back to Tavily (set TAVILY_API_KEY optionally)
+ *
+ * Required env vars: none (GitHub data is public)
+ * Optional env vars: TAVILY_API_KEY (for qxc/fc3d/p5 draw queries)
  */
 
-// ── Per-lottery search config ───────────────────────────────────
-const LOTTERY_CONFIG = {
-  ssq: {
-    name: '双色球',
-    latestQuery:  (today) => `双色球最新开奖结果 ${today} 期次 红球 蓝球 site:cwl.gov.cn OR site:zhcw.com OR site:500.com`,
-    issueQuery:   (issue) => `双色球 ${issue}期 开奖结果 红球 蓝球 site:cwl.gov.cn OR site:zhcw.com OR site:500.com`,
-    redCount: 6, blueCount: 1,
-    redRange: [1,33], blueRange: [1,16],
-  },
-  dlt: {
-    name: '大乐透',
-    latestQuery:  (today) => `大乐透最新开奖结果 ${today} 期次 前区 后区 site:lottery.gov.cn OR site:sporttery.cn OR site:500.com`,
-    issueQuery:   (issue) => `大乐透 ${issue}期 开奖结果 前区 后区 site:sporttery.cn OR site:500.com`,
-    redCount: 5, blueCount: 2,
-    redRange: [1,35], blueRange: [1,12],
-  },
-  qxc: {
-    name: '七星彩',
-    latestQuery:  (today) => `七星彩最新开奖号码 ${today} 期次 site:sporttery.cn OR site:500.com OR site:zhcw.com`,
-    issueQuery:   (issue) => `七星彩 ${issue}期 开奖号码 site:sporttery.cn OR site:500.com`,
-    redCount: 7, blueCount: 0,
-    redRange: [0,9], blueRange: null,
-  },
-  fc3d: {
-    name: '福彩3D',
-    latestQuery:  (today) => `福彩3D最新开奖号码 ${today} 期次 site:cwl.gov.cn OR site:zhcw.com OR site:500.com`,
-    issueQuery:   (issue) => `福彩3D ${issue}期 开奖号码 site:cwl.gov.cn OR site:zhcw.com`,
-    redCount: 3, blueCount: 0,
-    redRange: [0,9], blueRange: null,
-  },
-  p5: {
-    name: '排列五',
-    latestQuery:  (today) => `排列五最新开奖号码 ${today} 期次 site:cwl.gov.cn OR site:zhcw.com OR site:500.com`,
-    issueQuery:   (issue) => `排列五 ${issue}期 开奖号码 site:cwl.gov.cn OR site:zhcw.com`,
-    redCount: 5, blueCount: 0,
-    redRange: [0,9], blueRange: null,
-  },
+const RAW = 'https://raw.githubusercontent.com/yangxb919/lottery-data/main/data';
+
+// ── GitHub data source (ssq + dlt) ──────────────────────────────
+async function fetchFromGitHub(type, issue) {
+  // Latest draw
+  if (!issue) {
+    const resp = await fetch(`${RAW}/latest.json`, {
+      headers: { 'Cache-Control': 'no-cache' },
+      cf: { cacheTtl: 300 },           // Cloudflare edge cache 5 min
+    });
+    if (!resp.ok) throw new Error('GitHub latest fetch failed: ' + resp.status);
+    const data = await resp.json();
+    const entry = data.lotteries?.[type];
+    if (!entry) throw new Error('type not in latest.json: ' + type);
+    return normaliseEntry(type, entry);
+  }
+
+  // Historical draw by issue
+  const resp = await fetch(`${RAW}/${type}.json`, {
+    cf: { cacheTtl: 3600 },           // cache full history 1h
+  });
+  if (!resp.ok) throw new Error('GitHub history fetch failed: ' + resp.status);
+  const list = await resp.json();
+  const entry = list.find(e => String(e.issue) === String(issue));
+  if (!entry) return null;            // issue not found = not drawn yet
+  return normaliseEntry(type, entry);
+}
+
+function normaliseEntry(type, e) {
+  if (type === 'ssq') {
+    return {
+      issue: String(e.issue),
+      date:  e.date || '',
+      red:   (e.red  || []).map(Number),
+      blue:  (e.blue || []).map(Number),
+    };
+  }
+  if (type === 'dlt') {
+    return {
+      issue: String(e.issue),
+      date:  e.date || '',
+      red:   (e.front || e.red || []).map(Number),
+      blue:  (e.back  || e.blue || []).map(Number),
+    };
+  }
+  return null;
+}
+
+// ── Tavily fallback for qxc / fc3d / p5 ─────────────────────────
+const TAVILY_QUERIES = {
+  qxc:  (issue) => issue
+    ? `七星彩${issue}期开奖号码`
+    : `七星彩最新开奖号码 期次 site:sporttery.cn OR site:500.com`,
+  fc3d: (issue) => issue
+    ? `福彩3D${issue}期开奖号码`
+    : `福彩3D最新开奖号码 期次 site:cwl.gov.cn OR site:500.com`,
+  p5:   (issue) => issue
+    ? `排列五${issue}期开奖号码`
+    : `排列五最新开奖号码 期次 site:cwl.gov.cn OR site:500.com`,
 };
 
-// ── Tavily search ────────────────────────────────────────────────
-async function tavilySearch(apiKey, query) {
+async function fetchFromTavily(apiKey, type, issue) {
+  const query = TAVILY_QUERIES[type]?.(issue || null);
+  if (!query) throw new Error('No Tavily query for type: ' + type);
+
   const resp = await fetch('https://api.tavily.com/search', {
     method: 'POST',
     headers: {
@@ -57,141 +85,65 @@ async function tavilySearch(apiKey, query) {
     },
     body: JSON.stringify({
       query,
-      search_depth:    'advanced',   // deeper search for better results
-      max_results:     8,
-      include_answer:  true,
-      include_domains: [             // restrict to Chinese lottery sites
-        'cwl.gov.cn', 'zhcw.com', 'sporttery.cn',
-        'lottery.gov.cn', '500.com', 'cjcp.com.cn',
-        'caipiao.163.com', 'aicai.com',
+      search_depth:    'advanced',
+      max_results:     6,
+      include_answer:  false,          // skip AI answer — too unreliable
+      include_domains: [
+        'cwl.gov.cn', 'sporttery.cn', '500.com',
+        'zhcw.com', 'cjcp.com.cn', 'aicai.com',
       ],
       topic: 'general',
     }),
   });
+  if (!resp.ok) throw new Error('Tavily ' + resp.status);
 
-  if (!resp.ok) {
-    const t = await resp.text().catch(() => '');
-    throw new Error('TAVILY_' + resp.status + ': ' + t.slice(0, 200));
-  }
-  return resp.json();
+  const data = await resp.json();
+  const text = (data.results || [])
+    .map(r => (r.title || '') + ' ' + (r.content || ''))
+    .join('\n');
+
+  return parseTavilyText(type, text, issue);
 }
 
-// ── Extract issue number from text ───────────────────────────────
-function extractIssue(text) {
-  // Match 7-digit issues like 2026063
-  const matches = [...text.matchAll(/\b(20[23]\d{4})\b/g)]
+function parseTavilyText(type, text, targetIssue) {
+  // Issue: 5-digit (26063) or 7-digit (2026063)
+  const issueRe = /\b((?:20)?\d{2}[012]\d{2})\b/g;
+  const issues = [...text.matchAll(issueRe)]
     .map(m => parseInt(m[1]))
-    .filter(n => n >= 2020001 && n <= 2035365)
+    .filter(n => (n >= 20001 && n <= 30999) || (n >= 2020001 && n <= 2035365))
     .sort((a, b) => b - a);
-  return matches.length ? String(matches[0]) : null;
-}
+  let issue = targetIssue || (issues[0] ? String(issues[0]) : null);
+  if (!issue) return null;
 
-// ── Extract draw date from text ───────────────────────────────────
-function extractDate(text) {
-  const m = text.match(/(\d{4})[年\-\/](\d{1,2})[月\-\/](\d{1,2})/);
-  if (!m) return '';
-  return `${m[1]}-${m[2].padStart(2,'0')}-${m[3].padStart(2,'0')}`;
-}
-
-// ── Extract ball numbers ──────────────────────────────────────────
-function extractNumbers(text, cfg) {
-  const { redCount, blueCount, redRange, blueRange } = cfg;
-  const isSeq = redRange[0] === 0; // sequential 0-9 games
+  const dateM = text.match(/(\d{4})[-年](\d{1,2})[-月](\d{1,2})/);
+  const date  = dateM
+    ? `${dateM[1]}-${dateM[2].padStart(2,'0')}-${dateM[3].padStart(2,'0')}`
+    : '';
 
   let red = [], blue = [];
 
-  if (!isSeq) {
-    // ── Padded number games (ssq / dlt) ──
-    // Try explicit label pattern first
-    if (cfg.name === '双色球') {
-      // "红球：06 11 18 22 28 31 蓝球：12"
-      const m1 = text.match(/红球[号码：:\s]*((?:\d{1,2}[\s,，、]+){5}\d{1,2})/);
-      const m2 = text.match(/蓝球[号码：:\s]*(\d{1,2})/);
-      if (m1) red  = m1[1].match(/\d+/g).map(Number).filter(n => n>=1&&n<=33).slice(0,6);
-      if (m2) blue = [parseInt(m2[1])].filter(n => n>=1&&n<=16);
-
-      // Fallback: "06 11 18 22 28 31 + 12"
-      if (red.length < 6) {
-        const m3 = text.match(/\b(\d{2})\s+(\d{2})\s+(\d{2})\s+(\d{2})\s+(\d{2})\s+(\d{2})\s*[＋+]\s*(\d{2})/);
-        if (m3) {
-          red  = [m3[1],m3[2],m3[3],m3[4],m3[5],m3[6]].map(Number).filter(n=>n>=1&&n<=33);
-          blue = [parseInt(m3[7])].filter(n=>n>=1&&n<=16);
-        }
-      }
-    }
-
-    if (cfg.name === '大乐透') {
-      // "前区：05 11 18 24 33 后区：04 09"
-      const m1 = text.match(/前区[号码：:\s]*((?:\d{1,2}[\s,，、]+){4}\d{1,2})/);
-      const m2 = text.match(/后区[号码：:\s]*((?:\d{1,2}[\s,，、]+)?\d{1,2})/);
-      if (m1) red  = m1[1].match(/\d+/g).map(Number).filter(n=>n>=1&&n<=35).slice(0,5);
-      if (m2) blue = m2[1].match(/\d+/g).map(Number).filter(n=>n>=1&&n<=12).slice(0,2);
-
-      if (red.length < 5) {
-        const m3 = text.match(/\b(\d{2})\s+(\d{2})\s+(\d{2})\s+(\d{2})\s+(\d{2})\s*[＋+]\s*(\d{2})\s+(\d{2})/);
-        if (m3) {
-          red  = [m3[1],m3[2],m3[3],m3[4],m3[5]].map(Number).filter(n=>n>=1&&n<=35);
-          blue = [parseInt(m3[6]),parseInt(m3[7])].filter(n=>n>=1&&n<=12);
-        }
-      }
-    }
-
-  } else {
-    // ── Sequential digit games (qxc/fc3d/p5) ──
-    const nameMap = { '七星彩':'七星彩', '福彩3D':'3D|福彩3D', '排列五':'排列五' };
-    const pat = nameMap[cfg.name] || cfg.name;
-
-    // "七星彩：1 2 3 4 5 6 7" or "开奖号码：12345"
-    const m1 = text.match(new RegExp(
-      '(?:' + pat + '|开奖号码)[^\\d]*([\\d][\\s,，]*' +
-      '[\\d](?:[\\s,，]*[\\d]){' + (redCount-2) + '})'
-    ));
-    if (m1) {
-      const digits = m1[1].match(/\d/g);
-      if (digits && digits.length >= redCount) red = digits.slice(0, redCount).map(Number);
-    }
-
-    // Fallback: find a run of exactly redCount single digits
-    if (red.length < redCount) {
-      const allDigits = [...text.matchAll(/\b(\d)\b/g)].map(m => parseInt(m[1]));
-      if (allDigits.length >= redCount) red = allDigits.slice(0, redCount);
-    }
+  if (type === 'qxc') {
+    const m = text.match(/七星彩[^0-9]*(\d[\s,]*\d[\s,]*\d[\s,]*\d[\s,]*\d[\s,]*\d[\s,]*\d)/);
+    if (m) red = m[1].match(/\d/g).map(Number).slice(0, 7);
+  } else if (type === 'fc3d') {
+    const m = text.match(/3D[^0-9]*(\d[\s,]*\d[\s,]*\d)/i)
+           || text.match(/开奖号码[：:\s]*(\d{3})/);
+    if (m) red = m[1].match(/\d/g).map(Number).slice(0, 3);
+  } else if (type === 'p5') {
+    const m = text.match(/排列五[^0-9]*(\d[\s,]*\d[\s,]*\d[\s,]*\d[\s,]*\d)/);
+    if (m) red = m[1].match(/\d/g).map(Number).slice(0, 5);
   }
 
-  return { red, blue };
-}
-
-// ── Parse Tavily response into structured lottery data ────────────
-function parseLotteryData(cfg, tavilyData, targetIssue) {
-  // Merge answer + all result snippets
-  const chunks = [
-    tavilyData.answer || '',
-    ...(tavilyData.results || []).map(r => (r.title||'') + ' ' + (r.content||'')),
-  ];
-  const fullText = chunks.join('\n');
-
-  // Extract issue
-  let issue = targetIssue
-    ? (fullText.includes(String(targetIssue)) ? String(targetIssue) : extractIssue(fullText))
-    : extractIssue(fullText);
-
-  if (!issue) return null;
-
-  const date = extractDate(fullText);
-  const { red, blue } = extractNumbers(fullText, cfg);
-
-  const minRed = cfg.redCount;
-  const minBlue = cfg.blueCount;
-  if (red.length < minRed || blue.length < minBlue) return null;
-
-  return { issue, date, red: red.slice(0, minRed), blue: blue.slice(0, minBlue) };
+  const need = { qxc:7, fc3d:3, p5:5 }[type];
+  if (!need || red.length < need) return null;
+  return { issue, date, red, blue };
 }
 
 // ── Main handler ─────────────────────────────────────────────────
 export async function onRequestPost(context) {
   const { request, env } = context;
 
-  const origin  = request.headers.get('Origin') || '';
+  const origin = request.headers.get('Origin') || '';
   const cors = {
     'Access-Control-Allow-Origin':  env.ALLOWED_ORIGIN || origin || '*',
     'Access-Control-Allow-Methods': 'POST, OPTIONS',
@@ -203,36 +155,44 @@ export async function onRequestPost(context) {
   catch { return j({ error: 'Invalid JSON' }, 400, cors); }
 
   const { type, issue } = body;
-  if (!type || !LOTTERY_CONFIG[type]) return j({ error: 'Invalid type' }, 400, cors);
-
-  const apiKey = env.TAVILY_API_KEY;
-  if (!apiKey) return j({ error: 'TAVILY_API_KEY not configured' }, 500, cors);
-
-  const cfg = LOTTERY_CONFIG[type];
-  const todayBJ = new Date(Date.now() + 8*3600000).toISOString().slice(0,10);
-  const query = issue ? cfg.issueQuery(issue) : cfg.latestQuery(todayBJ);
-
-  let tavilyData;
-  try { tavilyData = await tavilySearch(apiKey, query); }
-  catch (e) { return j({ error: e.message }, 502, cors); }
-
-  const result = parseLotteryData(cfg, tavilyData, issue || null);
-
-  if (!result) {
-    // Return debug info so frontend can show a proper message
-    return j({
-      error:    'parse_failed',
-      query,
-      answer:   (tavilyData.answer || '').slice(0, 200),
-      snippets: (tavilyData.results || []).slice(0, 2).map(r => ({
-        url:     r.url,
-        title:   r.title,
-        content: (r.content || '').slice(0, 200),
-      })),
-    }, 200, cors);
+  const validTypes = ['ssq','dlt','qxc','fc3d','p5'];
+  if (!type || !validTypes.includes(type)) {
+    return j({ error: 'Invalid lottery type. Valid: ' + validTypes.join(',') }, 400, cors);
   }
 
-  return j(result, 200, cors);
+  try {
+    let result = null;
+
+    if (type === 'ssq' || type === 'dlt') {
+      // Primary: GitHub JSON data (accurate, fast, free)
+      result = await fetchFromGitHub(type, issue || null);
+
+      if (!result && !issue) {
+        return j({ error: 'Latest data not available from GitHub' }, 503, cors);
+      }
+      if (!result && issue) {
+        return j({ error: 'Issue ' + issue + ' not found — may not be drawn yet' }, 404, cors);
+      }
+
+    } else {
+      // qxc / fc3d / p5 — use Tavily if key is set
+      const apiKey = env.TAVILY_API_KEY;
+      if (!apiKey) {
+        return j({
+          error: 'TAVILY_API_KEY not configured (required for qxc/fc3d/p5)',
+        }, 500, cors);
+      }
+      result = await fetchFromTavily(apiKey, type, issue || null);
+      if (!result) {
+        return j({ error: 'draw_not_found', message: '未找到开奖数据，可能尚未开奖' }, 200, cors);
+      }
+    }
+
+    return j(result, 200, cors);
+
+  } catch (err) {
+    return j({ error: err.message }, 502, cors);
+  }
 }
 
 export async function onRequestOptions() {
