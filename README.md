@@ -1,8 +1,8 @@
 # 🌸 彩票随机号码生成器
 
-一款基于春日清新风格的彩票辅助工具，支持国内主流彩票的随机号码生成、期次实时获取、开奖查询与中奖核对。
+春日清新风格的彩票辅助工具，支持**双色球**和**大乐透**的随机号码生成、期次实时获取、开奖查询与中奖核对。
 
-**技术栈**：纯 HTML/CSS/JS 单文件前端 + Cloudflare Pages Functions + Tavily Search API
+**技术栈**：纯 HTML/CSS/JS 单文件前端 + Cloudflare Pages Functions + GitHub 开源彩票数据
 
 ---
 
@@ -10,52 +10,66 @@
 
 | 功能 | 说明 |
 |------|------|
-| 🎲 随机号码生成 | Fisher-Yates 洗牌 + crypto 随机源，5 种彩票 |
-| 🗓 实时期次获取 | 通过 Tavily 搜索获取最新真实期次，无本地推算 |
+| 🎲 随机号码生成 | Fisher-Yates 洗牌 + crypto 随机源，每注独立随机 |
+| 🗓 实时期次获取 | 从 GitHub 数据仓库读取最新已开期次，自动推算当前在售期次 |
 | ✏️ 手动编辑号码 | 点击球号可直接编辑，自动排序、校验、去重 |
 | 💰 购买价格提示 | 根据注数实时显示合计购买金额 |
 | 📋 历史记录管理 | 本地持久化存储，刷新不丢失，支持删除 |
-| 🔍 开奖结果查询 | Tavily 实时搜索开奖号码，自动高亮命中球 |
-| 🏆 中奖金额计算 | 自动匹配奖级并计算每注及合计预估奖金 |
-| 🔔 中奖弹窗提醒 | 进入页面自动检测历史记录中的中奖情况 |
-| 📱 移动端适配 | 完整响应式设计，支持 iPhone/Android |
-| 🌸 磨砂玻璃 UI | 春日清新风格，磨砂玻璃卡片质感 |
+| 🔍 开奖结果查询 | 一键从 GitHub 数据源获取指定期次开奖号码 |
+| 🏆 中奖核对 | 自动高亮命中球号，匹配奖级并估算奖金 |
+| 🔔 中奖弹窗提醒 | 进入页面自动检测历史中的中奖记录 |
+| 📱 移动端适配 | 完整响应式设计，横向滚动号码行，适配各尺寸手机 |
+| 🌸 磨砂玻璃 UI | 春日清新渐变背景 + 磨砂玻璃卡片质感 |
 
 ---
 
-## 支持的彩票类型
+## 支持的彩票
 
-| 彩票 | 类型 | 玩法说明 | 开奖时间 | 每注价格 |
-|------|------|---------|---------|---------|
-| 双色球 | 福彩 | 前区 1-33 选6红球 + 后区 1-16 选1蓝球 | 每周一、三、六 | ¥2 |
+| 彩票 | 类型 | 玩法 | 开奖时间 | 每注 |
+|------|------|------|---------|------|
+| 双色球 | 福彩 | 前区 1-33 选6红球 + 后区 1-16 选1蓝球 | 每周二、四、日 | ¥2 |
 | 大乐透 | 体彩 | 前区 1-35 选5 + 后区 1-12 选2 | 每周一、三、六 | ¥2 |
-| 七星彩 | 体彩 | 7个位置各选0-9，顺序匹配 | 每周日、二、四 | ¥2 |
-| 福彩3D | 福彩 | 3个位置各选0-9，直选/组选 | 每日 | ¥2 |
-| 排列五 | 福彩 | 5个位置各选0-9，直选 | 每日 | ¥2 |
 
 ---
 
 ## 项目结构
 
 ```
-lottery/
-├── index.html                  # 完整前端应用（单文件）
+/
+├── index.html                  # 完整前端应用（单文件，1600+ 行）
 ├── _headers                    # Cloudflare Pages 安全响应头
-├── _redirects                  # SPA 路由回退规则
+├── _redirects                  # SPA 路由回退
 ├── .gitignore
 ├── README.md
 └── functions/
     └── api/
-        └── lottery.js          # Pages Function：Tavily 搜索代理
+        └── lottery.js          # Pages Function：读取 GitHub 彩票数据
 ```
+
+---
+
+## 数据来源
+
+开奖数据来自开源仓库 [yangxb919/lottery-data](https://github.com/yangxb919/lottery-data)：
+
+- 数据源：500.com 彩票历史数据
+- 更新方式：GitHub Actions 每次开奖后约 30 分钟自动抓取并提交
+- 覆盖范围：双色球（3400+ 期）、大乐透（2800+ 期）全历史数据
+- 格式：JSON，示例：
+  ```json
+  { "issue": "26060", "date": "2026-05-28",
+    "red": ["07","09","10","16","22","27"], "blue": ["11"] }
+  ```
+
+**无需任何 API Key** — 数据完全公开免费。
 
 ---
 
 ## 本地运行
 
-无需构建工具，直接用浏览器打开 `index.html` 即可使用基础功能（生成号码、历史管理、手动中奖查询）。
+直接用浏览器打开 `index.html` 即可使用大部分功能（号码生成、历史管理、手动中奖查询）。
 
-开奖查询功能需要部署到 Cloudflare Pages 才能使用（需要 Pages Function + Tavily API Key）。
+> 开奖自动查询需要部署到 Cloudflare Pages（Pages Function 代理 GitHub 请求）。
 
 ---
 
@@ -64,96 +78,60 @@ lottery/
 ### 前置条件
 
 - [Cloudflare 账号](https://dash.cloudflare.com)（免费）
-- [Tavily API Key](https://app.tavily.com)（免费，每月 1000 次搜索）
 - [GitHub 账号](https://github.com)
 
 ### 第一步：推送到 GitHub
 
 1. 在 GitHub 新建仓库（Public 或 Private 均可）
-2. 将本项目所有文件上传到仓库根目录
-
-   > 直接在 GitHub 网页拖拽上传即可，无需命令行
+2. 将本项目所有文件上传到仓库根目录（GitHub 网页拖拽上传即可）
 
 ### 第二步：Cloudflare Pages 连接 GitHub
 
-1. 打开 [Cloudflare 控制台](https://dash.cloudflare.com) → **Workers & Pages**
-2. 点击 **Create** → **Pages** → **Connect to Git**
-3. 授权 GitHub，选择刚创建的仓库
-4. 构建配置保持默认（全部留空）：
-   - Framework preset：`None`
-   - Build command：留空
-   - Build output directory：留空
-5. 点击 **Save and Deploy**，等待约 1 分钟完成
+1. [Cloudflare 控制台](https://dash.cloudflare.com) → **Workers & Pages → Create → Pages → Connect to Git**
+2. 授权 GitHub，选择刚创建的仓库
+3. 构建配置全部留空（Framework preset 选 `None`，Build command 留空）
+4. 点击 **Save and Deploy**，等待约 1 分钟
 
-### 第三步：配置环境变量
+### 第三步：完成
 
-Pages 部署完成后：
-
-1. 进入 Pages 项目 → **Settings** → **Environment variables**
-2. 点击 **Add variable**，添加以下变量：
-
-   | 变量名 | 类型 | 值 |
-   |--------|------|----|
-   | `TAVILY_API_KEY` | **Secret**（加密存储） | `tvly-xxxxxxxxxxxxxxxx` |
-
-3. 点击 **Save**
-
-### 第四步：触发重新部署
-
-1. 回到 **Deployments** 标签页
-2. 找到最新的部署记录，点击右侧 **···** 菜单
-3. 选择 **Retry deployment**
-
-等待部署完成后，访问分配的 `xxx.pages.dev` 域名即可使用全部功能。
+访问分配的 `xxx.pages.dev` 域名即可使用全部功能，**无需配置任何环境变量**。
 
 ---
 
-## 获取 Tavily API Key
-
-1. 访问 [app.tavily.com](https://app.tavily.com)
-2. 注册账号（支持 Google 登录）
-3. 在控制台创建 API Key，格式为 `tvly-xxxxxxxxxxxxxxxxx`
-4. 免费套餐：每月 **1000 次**搜索（每次期次查询消耗 1 次，开奖查询消耗 1 次）
-
----
-
-## 架构说明
+## 架构
 
 ```
 浏览器
   │
-  ├─ 静态资源（index.html）← Cloudflare Pages CDN
+  ├─ 静态文件（index.html）← Cloudflare Pages CDN
   │
   └─ POST /api/lottery { type: "ssq" }
               │
        Pages Function (lottery.js)
-              │  读取 env.TAVILY_API_KEY（服务端，前端不可见）
+              │  无需 API Key
               ↓
-       api.tavily.com/search
-              │  搜索"双色球最新开奖号码期次"
-              ↓
-       正则解析期次 + 开奖号码
+       raw.githubusercontent.com/yangxb919/lottery-data
+              │  读取 latest.json 或 ssq.json / dlt.json
               ↓
        返回 { issue, date, red[], blue[] }
               │
        浏览器展示期次 / 高亮开奖号码
 ```
 
-**安全设计**：Tavily API Key 仅存在于 Cloudflare Pages 的加密环境变量中，前端代码不含任何密钥。
+Pages Function 作为代理的原因：浏览器直接请求 `raw.githubusercontent.com` 可能受 CORS 限制，通过同域 Function 转发可完全避免此问题。
 
 ---
 
-## 数据存储说明
+## 数据存储
 
-所有历史记录（生成的号码、期次、中奖查询结果）保存在**浏览器本地 `localStorage`** 中：
+所有历史记录保存在**浏览器本地 `localStorage`**：
 
-- ✅ 不上传任何服务器
+- ✅ 不上传任何服务器，完全本地
 - ✅ 刷新页面后保留
-- ⚠️ 清除浏览器数据或换设备后会丢失
-- ⚠️ 建议截图保存重要号码
+- ⚠️ 清除浏览器数据后丢失，建议截图保存重要号码
 
 ---
 
 ## 免责声明
 
-本工具仅供娱乐参考，号码由随机算法生成，不保证中奖。彩票有风险，购买需理性，未满 18 周岁禁止购买彩票。开奖信息通过网络搜索获取，请以彩票官方渠道公布的结果为准。
+本工具仅供娱乐参考，号码由随机算法生成，不保证中奖。彩票有风险，购买需理性，**未满 18 周岁禁止购买彩票**。开奖信息以彩票官方渠道公布的结果为准。

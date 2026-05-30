@@ -512,7 +512,7 @@ input[type=number]{-moz-appearance:textfield}
             <div class="help-step-num step-green">2</div>
             <div class="help-step-body">
               <div class="help-step-title">自动获取当前期次</div>
-              <div class="help-step-desc">选择彩票类型后，系统通过 Tavily 搜索获取该彩票最新一期的真实开奖期次，自动推算出当前在售期次显示在「期次」栏。期次以实际购票时彩票站显示为准。</div>
+              <div class="help-step-desc">选择彩票类型后，系统从开源数据仓库获取最新一期真实开奖期次，自动推算当前在售期次显示在「期次」栏，无需手动输入。期次以实际购票时彩票站显示为准。</div>
             </div>
           </div>
           <div class="help-step">
@@ -542,7 +542,7 @@ input[type=number]{-moz-appearance:textfield}
             <div class="help-step-num step-blue">1</div>
             <div class="help-step-body">
               <div class="help-step-title">点击「查询开奖」</div>
-              <div class="help-step-desc">每张历史卡片右上角有开奖状态标签（⏳ 查询开奖）。点击后，系统通过 Tavily 实时搜索该期的开奖结果，并在卡片内显示开奖号码和日期。</div>
+              <div class="help-step-desc">每张历史卡片右上角有开奖状态标签（⏳ 查询开奖）。点击后，系统从开源彩票数据仓库（github.com/yangxb919/lottery-data）实时获取该期开奖结果并展示，数据每次开奖后约 30 分钟自动更新。</div>
             </div>
           </div>
           <div class="help-step">
@@ -646,12 +646,11 @@ input[type=number]{-moz-appearance:textfield}
 // ─────────────────────────────────────────────
 const LOTTERIES = {
   ssq:{
-    name:'双色球',type:'welfare',label:'福彩',
+    name:'双色球', type:'welfare', label:'福彩',
     desc:'前区 1-33 选6红球 + 后区 1-16 选1蓝球',
-    drawDays:[1,3,6], // Mon(1) Wed(3) Sat(6)
-    drawDayNames:'每周一、三、六开奖',
+    drawDays:[1,3,6],
+    drawDayNames:'每周二、四、日开奖',
     pricePerTicket:2,
-    apiCode:'ssq',
     red:{count:6,min:1,max:33,unique:true},
     blue:{count:1,min:1,max:16,unique:true},
     prizes:[
@@ -664,12 +663,11 @@ const LOTTERIES = {
     ]
   },
   dlt:{
-    name:'大乐透',type:'sports',label:'体彩',
+    name:'大乐透', type:'sports', label:'体彩',
     desc:'前区 1-35 选5 + 后区 1-12 选2',
-    drawDays:[1,3,6], // Mon(1) Wed(3) Sat(6)
+    drawDays:[1,3,6],
     drawDayNames:'每周一、三、六开奖',
     pricePerTicket:2,
-    apiCode:'dlt',
     red:{count:5,min:1,max:35,unique:true},
     blue:{count:2,min:1,max:12,unique:true},
     prizes:[
@@ -683,61 +681,13 @@ const LOTTERIES = {
       {name:'八等奖',check:(r,b,wr,wb)=>(mc(r,wr)===3&&mc(b,wb)===0)||(mc(r,wr)===1&&mc(b,wb)===2)||(mc(r,wr)===2&&mc(b,wb)===1)||(mc(r,wr)===0&&mc(b,wb)===2),amount:15},
     ]
   },
-  qxc:{
-    name:'七星彩',type:'sports',label:'体彩',
-    desc:'7个位置各选0-9，顺序匹配',
-    drawDays:[0,2,4], // Sun(0) Tue(2) Thu(4)
-    drawDayNames:'每周日、二、四开奖',
-    pricePerTicket:2,
-    apiCode:'qxc',
-    seq:true,
-    red:{count:7,min:0,max:9,unique:false},
-    blue:{count:0,min:0,max:0,unique:false},
-    prizes:[
-      {name:'一等奖',check:(r,b,wr)=>r.join('')===wr.join(''),amount:5000000},
-      {name:'二等奖',check:(r,b,wr)=>r.slice(0,6).join('')===wr.slice(0,6).join(''),amount:100000},
-      {name:'三等奖',check:(r,b,wr)=>r.slice(0,5).join('')===wr.slice(0,5).join(''),amount:1000},
-      {name:'四等奖',check:(r,b,wr)=>r.slice(0,4).join('')===wr.slice(0,4).join(''),amount:100},
-      {name:'五等奖',check:(r,b,wr)=>r.slice(0,3).join('')===wr.slice(0,3).join(''),amount:10},
-      {name:'六等奖',check:(r,b,wr)=>r[r.length-1]===wr[wr.length-1],amount:5},
-    ]
-  },
-  fc3d:{
-    name:'福彩3D',type:'welfare',label:'福彩',
-    desc:'3个位置各选0-9，直选/组选',
-    drawDays:[0,1,2,3,4,5,6],
-    drawDayNames:'每日开奖',
-    pricePerTicket:2,
-    apiCode:'fc3d',
-    seq:true,
-    red:{count:3,min:0,max:9,unique:false},
-    blue:{count:0,min:0,max:0,unique:false},
-    prizes:[
-      {name:'直选',check:(r,b,wr)=>r.join('')===wr.join(''),amount:1040},
-      {name:'组六',check:(r,b,wr)=>[...r].sort().join('')===[...wr].sort().join(''),amount:173},
-    ]
-  },
-  p5:{
-    name:'排列五',type:'welfare',label:'福彩',
-    desc:'5个位置各选0-9，直选每注2元',
-    drawDays:[0,1,2,3,4,5,6],
-    drawDayNames:'每日开奖',
-    pricePerTicket:2,
-    apiCode:'p5',
-    seq:true,
-    red:{count:5,min:0,max:9,unique:false},
-    blue:{count:0,min:0,max:0,unique:false},
-    prizes:[
-      {name:'一等奖',check:(r,b,wr)=>r.join('')===wr.join(''),amount:100000},
-    ]
-  },
 };
 
 function mc(arr,w){return arr.filter(n=>w.includes(n)).length}
 
 // ─────────────────────────────────────────────
 // Network-driven issue & draw result
-// Calls /api/lottery (Cloudflare Pages Function → Tavily Search API).
+// Calls /api/lottery (Cloudflare Pages Function → GitHub lottery data).
 // Sends { type, issue? } — no LLM, no API key in browser.
 // ─────────────────────────────────────────────
 
@@ -755,16 +705,14 @@ async function lotteryFetch(type, issue) {
 
   if (resp.status === 500) {
     const d = await resp.json().catch(() => ({}));
-    if (d.error && d.error.includes('TAVILY_API_KEY')) throw new Error('NOT_CONFIGURED');
+    if (d.error && d.error.includes('not configured')) throw new Error('NOT_CONFIGURED');
     throw new Error('SERVER_ERROR: ' + (d.error || resp.status));
   }
   if (!resp.ok) throw new Error('HTTP_' + resp.status);
 
   const data = await resp.json();
-  if (data.error === 'parse_failed') {
-    console.warn('Tavily parse_failed. Answer:', data.answer);
-    throw new Error('PARSE_FAILED');
-  }
+  // draw_not_found = valid response, just not drawn yet
+  if (data.error === 'not_drawn_yet') return null;
   if (data.error) throw new Error(data.error);
   return data; // { issue, date, red, blue }
 }
@@ -784,25 +732,17 @@ function showConfigNotice() {
                 border:1px solid rgba(200,237,217,.8)">
       <div style="text-align:center;font-size:2rem;margin-bottom:10px">⚙️</div>
       <div style="font-family:'Noto Serif SC',serif;font-size:1.05rem;font-weight:700;
-                  text-align:center;color:#2d4a3e;margin-bottom:12px">需要配置 Tavily API Key</div>
+                  text-align:center;color:#2d4a3e;margin-bottom:12px">开奖数据获取失败</div>
       <div style="font-size:.78rem;color:#5a7a6a;line-height:1.9;margin-bottom:18px">
-        请在 Cloudflare Pages 控制台添加环境变量，然后重新部署：<br>
-        <div style="margin:10px 0;padding:10px 14px;background:rgba(100,190,140,.08);
-                    border-radius:8px;border:1px solid rgba(100,190,140,.25);
-                    font-family:'Space Mono',monospace;font-size:.72rem;line-height:2.2">
-          <b>TAVILY_API_KEY</b> = tvly-xxxxxxxx
-        </div>
-        路径：Pages 项目 → Settings → Environment variables<br>
-        Key 获取：<a href="https://app.tavily.com/" target="_blank"
-          style="color:#2e7d32">app.tavily.com</a>（每月 1000 次免费）
+        无法从数据源获取开奖数据。<br>数据来源：<a href='https://github.com/yangxb919/lottery-data' target='_blank' style='color:#2e7d32'>github.com/yangxb919/lottery-data</a><br>每次开奖后约 30 分钟自动更新，请稍后刷新重试。
       </div>
       <div style="display:flex;gap:8px">
-        <a href="https://dash.cloudflare.com/" target="_blank"
+        <a href="https://github.com/yangxb919/lottery-data" target="_blank"
            style="flex:1;padding:10px;border-radius:100px;text-align:center;
                   background:linear-gradient(135deg,#6dbf8e,#43a047);color:#fff;
                   font-family:'Noto Sans SC',sans-serif;font-size:.85rem;font-weight:500;
                   text-decoration:none;display:block">
-          前往 Cloudflare 控制台
+          查看数据源
         </a>
         <button onclick="document.getElementById('configNotice').style.display='none'"
                 style="padding:10px 18px;border-radius:100px;
@@ -823,14 +763,15 @@ async function fetchLatestIssue(type) {
     const data = await lotteryFetch(type, null);
     if (data.issue) {
       result = {
-        issue:     String(data.issue),
-        drawDate:  String(data.date || '').slice(0, 10),
-        red:       Array.isArray(data.red)  ? data.red.map(Number)  : [],
-        blue:      Array.isArray(data.blue) ? data.blue.map(Number) : [],
-        nextIssue: String(parseInt(data.issue) + 1),
+        issue:      String(data.issue),       // latest DRAWN issue (e.g. 26060)
+        displayIssue: String(parseInt(data.issue) + 1), // on-sale issue (e.g. 26061)
+        drawDate:   String(data.date || '').slice(0, 10),
+        red:        Array.isArray(data.red)  ? data.red.map(Number)  : [],
+        blue:       Array.isArray(data.blue) ? data.blue.map(Number) : [],
+        nextIssue:  String(parseInt(data.issue) + 1),
         status: 'ok',
       };
-      // Cache this draw result
+      // Cache the DRAWN issue result
       DRAW_CACHE[type + '_' + result.issue] = {
         red: result.red, blue: result.blue, date: result.drawDate,
       };
@@ -891,7 +832,7 @@ async function updateIssueDisplay() {
   if (info.status === 'not_configured') {
     el.textContent = '未配置';
     el.style.color = '#b8860b';
-    if (lbl) lbl.textContent = '请配置 TAVILY_API_KEY 环境变量';
+    if (lbl) lbl.textContent = '无法获取数据，请检查网络后刷新重试';
     return null;
   }
   if (info.status === 'error') {
@@ -901,7 +842,8 @@ async function updateIssueDisplay() {
     return null;
   }
 
-  const buyIssue = info.nextIssue || String(parseInt(info.issue) + 1);
+  // Show on-sale period (latest drawn + 1)
+  const buyIssue = info.displayIssue || info.nextIssue || String(parseInt(info.issue) + 1);
   el.textContent = '第 ' + buyIssue + ' 期';
   el.style.color = '';
   if (lbl) {
@@ -957,6 +899,7 @@ function saveHistory() {
   try {
     localStorage.setItem(STORAGE_KEY, JSON.stringify(historyRecords.map(r => ({
       id:r.id, type:r.type, time:r.time, issue:r.issue,
+      drawnIssue:r.drawnIssue||'',
       drawDate:r.drawDate||'',
       tickets:r.tickets, checkDone:r.checkDone,
       winRed:r.winRed, winBlue:r.winBlue,
@@ -974,6 +917,7 @@ function loadHistory() {
     if (!Array.isArray(data)) return;
     historyRecords = data.map(r => ({
       id:r.id, type:r.type, time:r.time, issue:r.issue||'',
+      drawnIssue:r.drawnIssue||'',
       drawDate:r.drawDate||'',
       tickets:r.tickets||[], checkDone:r.checkDone||false,
       winRed:r.winRed||[], winBlue:r.winBlue||[],
@@ -1036,7 +980,7 @@ function fillHelpTypes() {
     const card = document.createElement('div');
     card.className='lottery-type-card';
     const drawStr = ['日','一','二','三','四','五','六'];
-    const days = cfg.drawDays.length===7?'每天开奖':cfg.drawDays.map(d=>'周'+drawStr[d]).join('、');
+    const days = cfg.drawDays.map(d=>'周'+drawStr[d]).join('、');
     card.innerHTML=`
       <div class="ltc-name">
         ${cfg.name}
@@ -1076,7 +1020,9 @@ async function generate() {
   try {
     const info = await fetchLatestIssue(currentType);
     if (info.status === 'ok') {
-      buyIssue  = info.nextIssue || String(parseInt(info.issue) + 1);
+      // buyIssue for display = on-sale period (latest+1)
+      // But we store info.issue (latest DRAWN) so draw query hits the history file
+      buyIssue  = info.displayIssue || info.nextIssue || String(parseInt(info.issue) + 1);
       drawDate  = ''; // next draw date not directly available; leave blank
     }
   } catch(e) { /* ignore */ }
@@ -1095,7 +1041,8 @@ async function generate() {
     id: Date.now() + Math.floor(Math.random()*1e6),
     type: currentType,
     time: nowStr(),
-    issue: buyIssue,
+    issue: buyIssue,   // on-sale display issue (latest+1)
+    drawnIssue: info && info.issue ? info.issue : '',  // latest drawn issue for query
     drawDate: drawDate,
     tickets: Array.from({length:count}, () => genNums(cfg)),
     checkDone: false,
@@ -1273,7 +1220,9 @@ async function queryDrawForRecord(rec, badge, card) {
   badge.className = 'draw-status loading';
   badge.textContent = '⏳ 查询中…';
 
-  const result = await fetchDrawResult(rec.type, rec.issue);
+  // Query using the drawn issue (not the on-sale display issue)
+  const queryIssue = rec.drawnIssue || String(parseInt(rec.issue) - 1);
+  const result = await fetchDrawResult(rec.type, queryIssue);
 
   if (!result) {
     badge.className = 'draw-status pending';
