@@ -158,12 +158,26 @@ body::after{content:'';position:fixed;border-radius:50%;pointer-events:none;z-in
 
 /* Draw result row */
 .draw-result-row{
-  display:flex;align-items:center;gap:6px;flex-wrap:wrap;
-  padding:8px 10px;border-radius:10px;margin-bottom:8px;
+  display:flex;flex-direction:column;align-items:flex-start;gap:7px;
+  padding:9px 12px;border-radius:12px;margin-bottom:8px;
   background:rgba(232,245,233,.6);border:1px solid rgba(109,191,142,.25);
 }
-.draw-result-label{font-size:.63rem;color:var(--text-muted);letter-spacing:.05em;min-width:40px}
-.draw-result-date{font-size:.65rem;color:var(--text-secondary);letter-spacing:.03em}
+.draw-result-info{
+  display:flex;align-items:center;gap:6px;flex-wrap:nowrap;
+  font-size:.67rem;color:var(--text-secondary);letter-spacing:.04em;line-height:1;
+  width:100%;
+}
+.draw-result-info-label{
+  font-weight:500;color:#2e7d32;white-space:nowrap;
+}
+.draw-result-info-date{
+  color:var(--text-muted);white-space:nowrap;
+}
+.draw-result-balls{
+  display:flex;align-items:center;gap:5px;flex-wrap:nowrap;
+  overflow-x:auto;scrollbar-width:none;padding:2px 1px;
+}
+.draw-result-balls::-webkit-scrollbar{display:none}
 
 .btn-query{padding:4px 11px;border-radius:100px;font-size:.7rem;cursor:pointer;transition:all .15s;border:1.5px solid rgba(67,160,71,.4);background:rgba(67,160,71,.08);color:#2e7d32;font-family:'Noto Sans SC',sans-serif;font-weight:500}
 .btn-query:hover{background:rgba(67,160,71,.18)}
@@ -1164,45 +1178,56 @@ function renderDrawRow(container, rec) {
   const cfg = LOTTERIES[rec.type];
   const dr = rec.drawResult;
   container.innerHTML = '';
+
   const row = document.createElement('div');
   row.className = 'draw-result-row';
 
-  const lbl = document.createElement('span');
-  lbl.className = 'draw-result-label'; lbl.textContent = '开奖号';
-  row.appendChild(lbl);
+  // ── Info line: "第26061期开奖结果 · 2026-05-30" ──
+  const info = document.createElement('div');
+  info.className = 'draw-result-info';
+  const issueLbl = document.createElement('span');
+  issueLbl.className = 'draw-result-info-label';
+  issueLbl.textContent = `第${rec.issue}期开奖结果`;
+  info.appendChild(issueLbl);
+  if (dr.date) {
+    const dot = document.createElement('span');
+    dot.style.cssText = 'color:var(--text-muted);opacity:.5';
+    dot.textContent = '·';
+    info.appendChild(dot);
+    const dateLbl = document.createElement('span');
+    dateLbl.className = 'draw-result-info-date';
+    dateLbl.textContent = dr.date.slice(0, 10);
+    info.appendChild(dateLbl);
+  }
+  row.appendChild(info);
 
-  const redsWrap = document.createElement('div');
-  redsWrap.className = 'balls-inline';
+  // ── Balls line: red + separator + blue, same size as ticket balls ──
+  const ballsRow = document.createElement('div');
+  ballsRow.className = 'draw-result-balls';
+
   dr.red.forEach(n => {
     const b = document.createElement('div');
     b.className = 'ball red';
-    b.style.cssText = 'width:28px;height:28px;font-size:.68rem;cursor:default';
+    b.style.cssText = 'width:var(--ball-size);height:var(--ball-size);cursor:default;flex-shrink:0';
     b.innerHTML = `<span>${fmt(n, cfg.red)}</span>`;
-    redsWrap.appendChild(b);
+    ballsRow.appendChild(b);
   });
-  row.appendChild(redsWrap);
 
   if (dr.blue && dr.blue.length > 0) {
-    const sep = document.createElement('div'); sep.className = 'row-sep'; row.appendChild(sep);
-    const bluesWrap = document.createElement('div');
-    bluesWrap.className = 'balls-inline';
+    const sep = document.createElement('div');
+    sep.className = 'row-sep';
+    sep.style.flexShrink = '0';
+    ballsRow.appendChild(sep);
     dr.blue.forEach(n => {
       const b = document.createElement('div');
       b.className = 'ball blue';
-      b.style.cssText = 'width:28px;height:28px;font-size:.68rem;cursor:default';
+      b.style.cssText = 'width:var(--ball-size);height:var(--ball-size);cursor:default;flex-shrink:0';
       b.innerHTML = `<span>${fmt(n, cfg.blue)}</span>`;
-      bluesWrap.appendChild(b);
+      ballsRow.appendChild(b);
     });
-    row.appendChild(bluesWrap);
   }
 
-  if (dr.date) {
-    const dateSpan = document.createElement('span');
-    dateSpan.className = 'draw-result-date';
-    dateSpan.textContent = '开奖日期：' + dr.date.slice(0,10);
-    row.appendChild(dateSpan);
-  }
-
+  row.appendChild(ballsRow);
   container.appendChild(row);
 }
 
@@ -1211,22 +1236,23 @@ function renderDrawRow(container, rec) {
 // ─────────────────────────────────────────────
 async function queryDrawForRecord(rec, badge, card) {
   if (rec.drawResult) {
-    // Already fetched - open checker with auto-filled numbers
+    // Already fetched — open checker
     autoFillAndCheck(rec);
     return;
   }
   badge.className = 'draw-status loading';
   badge.textContent = '⏳ 查询中…';
 
-  // Query using the drawn issue (not the on-sale display issue)
-  const queryIssue = rec.drawnIssue || String(parseInt(rec.issue) - 1);
-  const result = await fetchDrawResult(rec.type, queryIssue);
+  // Query the EXACT issue these tickets are for
+  const result = await fetchDrawResult(rec.type, rec.issue);
 
   if (!result) {
+    // Not drawn yet — show estimated draw info
     badge.className = 'draw-status pending';
     badge.textContent = '⏳ 未开奖';
-    // Show small toast
-    showToast('该期尚未开奖或查询失败，请稍后重试');
+    const cfg = LOTTERIES[rec.type];
+    const drawDayNames = cfg.drawDayNames || '开奖日';
+    showToast(`第${rec.issue}期尚未开奖，${drawDayNames}开奖，请届时再查`);
     return;
   }
 
