@@ -1,46 +1,41 @@
 /**
  * Cloudflare Pages Function: /api/lottery
  *
- * Data source: https://raw.githubusercontent.com/yangxb919/lottery-data/main/data/
- * - data/latest.json  — latest draw for ssq & dlt (updated daily by GitHub Actions)
- * - data/ssq.json     — full ssq history, latest first
- * - data/dlt.json     — full dlt history, latest first
+ * Data source: https://github.com/yangxb919/lottery-data
+ * Updated daily by GitHub Actions after each draw (~22:05 BJT).
  *
- * For qxc / fc3d / p5: falls back to Tavily (set TAVILY_API_KEY optionally)
+ * Supported types: ssq (双色球), dlt (大乐透)
  *
- * Required env vars: none (GitHub data is public)
- * Optional env vars: TAVILY_API_KEY (for qxc/fc3d/p5 draw queries)
+ * No API keys required — data is public on GitHub.
  */
 
 const RAW = 'https://raw.githubusercontent.com/yangxb919/lottery-data/main/data';
 
-// ── GitHub data source (ssq + dlt) ──────────────────────────────
-async function fetchFromGitHub(type, issue) {
-  // Latest draw
-  if (!issue) {
-    const resp = await fetch(`${RAW}/latest.json`, {
-      headers: { 'Cache-Control': 'no-cache' },
-      cf: { cacheTtl: 300 },           // Cloudflare edge cache 5 min
-    });
-    if (!resp.ok) throw new Error('GitHub latest fetch failed: ' + resp.status);
-    const data = await resp.json();
-    const entry = data.lotteries?.[type];
-    if (!entry) throw new Error('type not in latest.json: ' + type);
-    return normaliseEntry(type, entry);
-  }
+// ── Fetch from GitHub JSON files ─────────────────────────────────
+async function fetchLatest(type) {
+  const resp = await fetch(`${RAW}/latest.json`, {
+    cf: { cacheTtl: 300 },   // Cloudflare edge cache: 5 min
+  });
+  if (!resp.ok) throw new Error('GitHub fetch failed: ' + resp.status);
+  const data = await resp.json();
 
-  // Historical draw by issue
+  const entry = data.lotteries?.[type];
+  if (!entry) throw new Error('Type not in latest.json: ' + type);
+  return normalise(type, entry);
+}
+
+async function fetchByIssue(type, issue) {
   const resp = await fetch(`${RAW}/${type}.json`, {
-    cf: { cacheTtl: 3600 },           // cache full history 1h
+    cf: { cacheTtl: 3600 },  // cache full history: 1 hour
   });
   if (!resp.ok) throw new Error('GitHub history fetch failed: ' + resp.status);
   const list = await resp.json();
+
   const entry = list.find(e => String(e.issue) === String(issue));
-  if (!entry) return null;            // issue not found = not drawn yet
-  return normaliseEntry(type, entry);
+  return entry ? normalise(type, entry) : null;
 }
 
-function normaliseEntry(type, e) {
+function normalise(type, e) {
   if (type === 'ssq') {
     return {
       issue: String(e.issue),
@@ -49,94 +44,13 @@ function normaliseEntry(type, e) {
       blue:  (e.blue || []).map(Number),
     };
   }
-  if (type === 'dlt') {
-    return {
-      issue: String(e.issue),
-      date:  e.date || '',
-      red:   (e.front || e.red || []).map(Number),
-      blue:  (e.back  || e.blue || []).map(Number),
-    };
-  }
-  return null;
-}
-
-// ── Tavily fallback for qxc / fc3d / p5 ─────────────────────────
-const TAVILY_QUERIES = {
-  qxc:  (issue) => issue
-    ? `七星彩${issue}期开奖号码`
-    : `七星彩最新开奖号码 期次 site:sporttery.cn OR site:500.com`,
-  fc3d: (issue) => issue
-    ? `福彩3D${issue}期开奖号码`
-    : `福彩3D最新开奖号码 期次 site:cwl.gov.cn OR site:500.com`,
-  p5:   (issue) => issue
-    ? `排列五${issue}期开奖号码`
-    : `排列五最新开奖号码 期次 site:cwl.gov.cn OR site:500.com`,
-};
-
-async function fetchFromTavily(apiKey, type, issue) {
-  const query = TAVILY_QUERIES[type]?.(issue || null);
-  if (!query) throw new Error('No Tavily query for type: ' + type);
-
-  const resp = await fetch('https://api.tavily.com/search', {
-    method: 'POST',
-    headers: {
-      'Content-Type':  'application/json',
-      'Authorization': 'Bearer ' + apiKey,
-    },
-    body: JSON.stringify({
-      query,
-      search_depth:    'advanced',
-      max_results:     6,
-      include_answer:  false,          // skip AI answer — too unreliable
-      include_domains: [
-        'cwl.gov.cn', 'sporttery.cn', '500.com',
-        'zhcw.com', 'cjcp.com.cn', 'aicai.com',
-      ],
-      topic: 'general',
-    }),
-  });
-  if (!resp.ok) throw new Error('Tavily ' + resp.status);
-
-  const data = await resp.json();
-  const text = (data.results || [])
-    .map(r => (r.title || '') + ' ' + (r.content || ''))
-    .join('\n');
-
-  return parseTavilyText(type, text, issue);
-}
-
-function parseTavilyText(type, text, targetIssue) {
-  // Issue: 5-digit (26063) or 7-digit (2026063)
-  const issueRe = /\b((?:20)?\d{2}[012]\d{2})\b/g;
-  const issues = [...text.matchAll(issueRe)]
-    .map(m => parseInt(m[1]))
-    .filter(n => (n >= 20001 && n <= 30999) || (n >= 2020001 && n <= 2035365))
-    .sort((a, b) => b - a);
-  let issue = targetIssue || (issues[0] ? String(issues[0]) : null);
-  if (!issue) return null;
-
-  const dateM = text.match(/(\d{4})[-年](\d{1,2})[-月](\d{1,2})/);
-  const date  = dateM
-    ? `${dateM[1]}-${dateM[2].padStart(2,'0')}-${dateM[3].padStart(2,'0')}`
-    : '';
-
-  let red = [], blue = [];
-
-  if (type === 'qxc') {
-    const m = text.match(/七星彩[^0-9]*(\d[\s,]*\d[\s,]*\d[\s,]*\d[\s,]*\d[\s,]*\d[\s,]*\d)/);
-    if (m) red = m[1].match(/\d/g).map(Number).slice(0, 7);
-  } else if (type === 'fc3d') {
-    const m = text.match(/3D[^0-9]*(\d[\s,]*\d[\s,]*\d)/i)
-           || text.match(/开奖号码[：:\s]*(\d{3})/);
-    if (m) red = m[1].match(/\d/g).map(Number).slice(0, 3);
-  } else if (type === 'p5') {
-    const m = text.match(/排列五[^0-9]*(\d[\s,]*\d[\s,]*\d[\s,]*\d[\s,]*\d)/);
-    if (m) red = m[1].match(/\d/g).map(Number).slice(0, 5);
-  }
-
-  const need = { qxc:7, fc3d:3, p5:5 }[type];
-  if (!need || red.length < need) return null;
-  return { issue, date, red, blue };
+  // dlt: front/back or red/blue
+  return {
+    issue: String(e.issue),
+    date:  e.date || '',
+    red:   (e.front || e.red  || []).map(Number),
+    blue:  (e.back  || e.blue || []).map(Number),
+  };
 }
 
 // ── Main handler ─────────────────────────────────────────────────
@@ -155,41 +69,23 @@ export async function onRequestPost(context) {
   catch { return j({ error: 'Invalid JSON' }, 400, cors); }
 
   const { type, issue } = body;
-  const validTypes = ['ssq','dlt','qxc','fc3d','p5'];
-  if (!type || !validTypes.includes(type)) {
-    return j({ error: 'Invalid lottery type. Valid: ' + validTypes.join(',') }, 400, cors);
+  if (!type || !['ssq', 'dlt'].includes(type)) {
+    return j({ error: 'Invalid type. Supported: ssq, dlt' }, 400, cors);
   }
 
   try {
-    let result = null;
-
-    if (type === 'ssq' || type === 'dlt') {
-      // Primary: GitHub JSON data (accurate, fast, free)
-      result = await fetchFromGitHub(type, issue || null);
-
-      if (!result && !issue) {
-        return j({ error: 'Latest data not available from GitHub' }, 503, cors);
-      }
-      if (!result && issue) {
-        return j({ error: 'Issue ' + issue + ' not found — may not be drawn yet' }, 404, cors);
-      }
-
-    } else {
-      // qxc / fc3d / p5 — use Tavily if key is set
-      const apiKey = env.TAVILY_API_KEY;
-      if (!apiKey) {
-        return j({
-          error: 'TAVILY_API_KEY not configured (required for qxc/fc3d/p5)',
-        }, 500, cors);
-      }
-      result = await fetchFromTavily(apiKey, type, issue || null);
+    if (issue) {
+      // Query a specific draw
+      const result = await fetchByIssue(type, issue);
       if (!result) {
-        return j({ error: 'draw_not_found', message: '未找到开奖数据，可能尚未开奖' }, 200, cors);
+        return j({ error: 'not_drawn_yet', message: `第${issue}期尚未开奖` }, 200, cors);
       }
+      return j(result, 200, cors);
+    } else {
+      // Get latest draw
+      const result = await fetchLatest(type);
+      return j(result, 200, cors);
     }
-
-    return j(result, 200, cors);
-
   } catch (err) {
     return j({ error: err.message }, 502, cors);
   }
