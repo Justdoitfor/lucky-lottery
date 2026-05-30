@@ -1017,13 +1017,11 @@ async function generate() {
   // Fetch latest issue from network; fall back to display value
   let buyIssue = null;
   let drawDate = '';
+  let info = null;
   try {
-    const info = await fetchLatestIssue(currentType);
-    if (info.status === 'ok') {
-      // buyIssue for display = on-sale period (latest+1)
-      // But we store info.issue (latest DRAWN) so draw query hits the history file
-      buyIssue  = info.displayIssue || info.nextIssue || String(parseInt(info.issue) + 1);
-      drawDate  = ''; // next draw date not directly available; leave blank
+    info = await fetchLatestIssue(currentType);
+    if (info && info.status === 'ok') {
+      buyIssue = info.displayIssue || info.nextIssue || String(parseInt(info.issue) + 1);
     }
   } catch(e) { /* ignore */ }
 
