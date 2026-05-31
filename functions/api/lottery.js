@@ -1,7 +1,7 @@
 /**
  * Cloudflare Pages Function: /api/lottery
  *
- * Data source: https://github.com/yangxb919/lottery-data
+ * Data source: https://github.com/Justdoitfor/my-lottery-data
  * Updated daily by GitHub Actions after each draw (~22:05 BJT).
  *
  * Supported types: ssq (双色球), dlt (大乐透)
@@ -9,7 +9,7 @@
  * No API keys required — data is public on GitHub.
  */
 
-const RAW = 'https://raw.githubusercontent.com/yangxb919/lottery-data/main/data';
+const RAW = 'https://raw.githubusercontent.com/Justdoitfor/my-lottery-data/main/data';
 
 // ── Fetch from GitHub JSON files ─────────────────────────────────
 async function fetchLatest(type) {
