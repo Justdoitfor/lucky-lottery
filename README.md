@@ -50,11 +50,11 @@
 
 ## 数据来源
 
-开奖数据来自开源仓库 [yangxb919/lottery-data](https://github.com/yangxb919/lottery-data)：
+开奖数据来源 [Justdoitfor/my-lottery-data](https://github.com/Justdoitfor/my-lottery-data)：
 
 - 数据源：500.com 彩票历史数据
 - 更新方式：GitHub Actions 每次开奖后约 30 分钟自动抓取并提交
-- 覆盖范围：双色球（3400+ 期）、大乐透（2800+ 期）全历史数据
+- 覆盖范围：双色球、大乐透历史数据
 - 格式：JSON，示例：
   ```json
   { "issue": "26060", "date": "2026-05-28",
@@ -110,7 +110,7 @@
        Pages Function (lottery.js)
               │  无需 API Key
               ↓
-       raw.githubusercontent.com/yangxb919/lottery-data
+       raw.githubusercontent.com/Justdoitfor/my-lottery-data
               │  读取 latest.json 或 ssq.json / dlt.json
               ↓
        返回 { issue, date, red[], blue[] }
